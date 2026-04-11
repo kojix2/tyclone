@@ -133,7 +133,13 @@ jobs:
 
       - name: Smoke test binary
         if: matrix.target != 'x86_64-pc-windows-gnu' && matrix.target != 'aarch64-apple-darwin'
-        run: ./bin/toyclone --help
+        run: |
+          ./bin/toyclone --help
+          ldd ./bin/toyclone
+          if ldd ./bin/toyclone | grep -F 'libpcv_kernel.so'; then
+            echo "Error: dynamic dependency on libpcv_kernel.so detected"
+            exit 1
+          fi
 
       - name: Smoke test binary (macOS)
         if: matrix.target == 'aarch64-apple-darwin'
