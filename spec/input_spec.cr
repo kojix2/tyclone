@@ -2,7 +2,7 @@ require "./spec_helper"
 
 describe Toyclone::Input do
   it "fills default tumour_content and error_rate" do
-    path = "/tmp/toyclone_input_#{Random.rand(1_000_000)}.tsv"
+    path = File.join(Dir.tempdir, "toyclone_input_#{Random.rand(1_000_000)}.tsv")
     begin
       File.write(
         path,
@@ -20,7 +20,7 @@ describe Toyclone::Input do
   end
 
   it "raises when required column is missing" do
-    path = "/tmp/toyclone_input_#{Random.rand(1_000_000)}.tsv"
+    path = File.join(Dir.tempdir, "toyclone_input_#{Random.rand(1_000_000)}.tsv")
     begin
       File.write(
         path,
