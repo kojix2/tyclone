@@ -8,7 +8,6 @@ use crate::inference::fit_variational_model;
 use crate::preprocess::{build_log_p_data, build_log_p_data_parallel, get_ccf_grid};
 use crate::types::{DataPreprocessor, Density, PcvConfig, PcvError, PcvResult, PcvRow, Priors, VariationalParameters};
 use rand::rngs::StdRng;
-use rand::RngCore;
 use rand::SeedableRng;
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
@@ -650,8 +649,7 @@ pub extern "C" fn pcv_fit(
     let base_seed = if cfg.use_seed == 1 {
         cfg.seed
     } else {
-        let mut entropy_rng = StdRng::from_entropy();
-        entropy_rng.next_u64()
+        rand::random::<u64>()
     };
 
     let run_all_restarts = || -> Result<Vec<RestartOutcome>, String> {
