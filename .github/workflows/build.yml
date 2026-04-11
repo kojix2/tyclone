@@ -122,14 +122,13 @@ jobs:
           docker run -d --name toyclone-alpine -v "$PWD":/workspace -w /workspace crystallang/crystal:latest-alpine tail -f /dev/null
           trap 'docker rm -f toyclone-alpine' EXIT
           docker exec toyclone-alpine apk add --no-cache build-base readline-dev readline-static ncurses-dev ncurses-static ncurses-libs rust cargo make
-          docker exec toyclone-alpine shards install --without-development
-          docker exec toyclone-alpine make build EXTRA_CRYSTAL_BUILD_FLAGS="--release --static"
+          docker exec -u "$(id -u):$(id -g)" toyclone-alpine shards install --without-development
+          docker exec -u "$(id -u):$(id -g)" toyclone-alpine make build EXTRA_CRYSTAL_BUILD_FLAGS="--release --static"
 
       - name: Build release binary (Linux host check)
         if: matrix.target == 'x86_64-unknown-linux-musl'
         shell: bash
         run: |
-          chmod +x ./bin/toyclone
           ldd ./bin/toyclone || echo "Static binary (no dynamic dependencies)"
           file ./bin/toyclone
 
