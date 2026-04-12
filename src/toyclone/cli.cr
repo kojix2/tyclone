@@ -64,7 +64,7 @@ module Toyclone
           on("--precision=F", "Beta-binomial precision") { |v| opt.precision = v.to_f64 }
           on("--print-freq=N", "Progress print interval") { |v| opt.print_freq = v.to_i32 }
           on("--seed=U", "Random seed") { |v| opt.seed = v.to_u64 }
-          on("--kernel-threads=N", "Kernel threads") { |v| opt.kernel_threads = v.to_i32 }
+          on("--kernel-threads=N", "Kernel threads (0=auto)") { |v| opt.kernel_threads = v.to_i32 }
           on("--restart-parallelism=N", "Outer restart parallelism") { |v| opt.restart_parallelism = v.to_i32 }
           on("--compress", "Write gzip output") { opt.compress = true }
 

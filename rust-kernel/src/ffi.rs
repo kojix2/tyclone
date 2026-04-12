@@ -559,19 +559,25 @@ pub extern "C" fn pcv_fit(
         }
         return 1;
     }
-    if cfg.kernel_threads <= 0 {
+    if cfg.kernel_threads < 0 {
         if !out_error.is_null() {
             unsafe {
-                *out_error = make_error("kernel_threads must be > 0");
+                *out_error = make_error("kernel_threads must be >= 0");
             }
         }
         return 1;
     }
 
-    let enable_rayon = cfg.kernel_threads > 1;
+    let kernel_threads = if cfg.kernel_threads == 0 {
+        std::thread::available_parallelism().map_or(1, |n| n.get())
+    } else {
+        cfg.kernel_threads as usize
+    };
+
+    let enable_rayon = kernel_threads > 1;
 
     let rayon_pool = if enable_rayon {
-        match ThreadPoolBuilder::new().num_threads(cfg.kernel_threads as usize).build() {
+        match ThreadPoolBuilder::new().num_threads(kernel_threads).build() {
             Ok(pool) => Some(pool),
             Err(error) => {
                 if !out_error.is_null() {

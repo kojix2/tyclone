@@ -45,7 +45,7 @@ module Toyclone
       @precision = 200.0
       @print_freq = 100
       @seed = nil
-      @kernel_threads = 1
+      @kernel_threads = 0
       @restart_parallelism = 1
       @compress = false
       @help_message = ""
