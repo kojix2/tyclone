@@ -62,8 +62,24 @@ struct RestartMetric {
     used_clusters: usize,
 }
 
+#[derive(Clone, Debug)]
+struct RestartInitStats {
+    restart_index: usize,
+    restart_seed: u64,
+    init_used_clusters: usize,
+    pi_entropy: f64,
+    pi_max: f64,
+    z_entropy_mean: f64,
+    z_max_mean: f64,
+    theta_entropy_mean: f64,
+    theta_max_mean: f64,
+    final_elbo: f64,
+    final_used_clusters: usize,
+}
+
 struct RestartOutcome {
     metric: RestartMetric,
+    init_stats: RestartInitStats,
     var_params: VariationalParameters,
 }
 
@@ -93,6 +109,91 @@ fn restart_seed(base_seed: u64, restart_index: usize) -> u64 {
     base_seed ^ ((restart_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
 }
 
+fn entropy(values: &[f64]) -> f64 {
+    let mut total = 0.0;
+    for value in values {
+        if *value > 0.0 {
+            total -= *value * value.ln();
+        }
+    }
+    total
+}
+
+fn mean_row_entropy(values: &[f64], row_width: usize) -> f64 {
+    if row_width == 0 || values.is_empty() {
+        return 0.0;
+    }
+
+    let mut total = 0.0;
+    let mut count = 0usize;
+    for row in values.chunks(row_width) {
+        total += entropy(row);
+        count += 1;
+    }
+    total / count as f64
+}
+
+fn mean_row_max(values: &[f64], row_width: usize) -> f64 {
+    if row_width == 0 || values.is_empty() {
+        return 0.0;
+    }
+
+    let mut total = 0.0;
+    let mut count = 0usize;
+    for row in values.chunks(row_width) {
+        let row_max = row.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        total += row_max;
+        count += 1;
+    }
+    total / count as f64
+}
+
+fn collect_restart_init_stats(
+    restart_index: usize,
+    restart_seed: u64,
+    var_params: &VariationalParameters,
+) -> RestartInitStats {
+    let pi_max = var_params.pi.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    RestartInitStats {
+        restart_index,
+        restart_seed,
+        init_used_clusters: num_used_clusters(var_params),
+        pi_entropy: entropy(&var_params.pi),
+        pi_max,
+        z_entropy_mean: mean_row_entropy(&var_params.z, var_params.num_clusters),
+        z_max_mean: mean_row_max(&var_params.z, var_params.num_clusters),
+        theta_entropy_mean: mean_row_entropy(&var_params.theta, var_params.num_grid_points),
+        theta_max_mean: mean_row_max(&var_params.theta, var_params.num_grid_points),
+        final_elbo: f64::NEG_INFINITY,
+        final_used_clusters: 0,
+    }
+}
+
+fn write_restart_init_stats(path: &str, stats: &[RestartInitStats]) -> Result<(), String> {
+    let mut lines = Vec::with_capacity(stats.len() + 1);
+    lines.push(
+        "restart,seed,init_used_clusters,pi_entropy,pi_max,z_entropy_mean,z_max_mean,theta_entropy_mean,theta_max_mean,final_elbo,final_used_clusters".to_string(),
+    );
+    for s in stats {
+        lines.push(format!(
+            "{},{},{},{:.15},{:.15},{:.15},{:.15},{:.15},{:.15},{:.15},{}",
+            s.restart_index,
+            s.restart_seed,
+            s.init_used_clusters,
+            s.pi_entropy,
+            s.pi_max,
+            s.z_entropy_mean,
+            s.z_max_mean,
+            s.theta_entropy_mean,
+            s.theta_max_mean,
+            s.final_elbo,
+            s.final_used_clusters,
+        ));
+    }
+    fs::write(path, lines.join("\n") + "\n")
+        .map_err(|e| format!("failed to write restart init stats file: {e}"))
+}
+
 fn run_restart_with_rng(
     restart_index: usize,
     restart_seed: u64,
@@ -113,6 +214,7 @@ fn run_restart_with_rng(
         log_p_num_grid_points,
         restart_rng,
     )?;
+    let mut init_stats = collect_restart_init_stats(restart_index, restart_seed, &var_params);
 
     let trace = fit_variational_model(
         priors,
@@ -124,6 +226,8 @@ fn run_restart_with_rng(
 
     let final_elbo = *trace.last().unwrap_or(&f64::NEG_INFINITY);
     let used_clusters = num_used_clusters(&var_params);
+    init_stats.final_elbo = final_elbo;
+    init_stats.final_used_clusters = used_clusters;
 
     Ok(RestartOutcome {
         metric: RestartMetric {
@@ -132,6 +236,7 @@ fn run_restart_with_rng(
             final_elbo,
             used_clusters,
         },
+        init_stats,
         var_params,
     })
 }
@@ -809,6 +914,10 @@ pub extern "C" fn pcv_fit(
         .iter()
         .map(|outcome| outcome.metric.clone())
         .collect::<Vec<_>>();
+    let restart_init_stats = restart_outcomes
+        .iter()
+        .map(|outcome| outcome.init_stats.clone())
+        .collect::<Vec<_>>();
 
     if cfg.print_freq > 0 {
         eprintln!(
@@ -817,8 +926,19 @@ pub extern "C" fn pcv_fit(
         );
     }
 
-    if let Ok(path) = env::var("PCV_DEBUG_RESTART_METRICS_FILE") {
-        if let Err(message) = write_restart_metrics(&path, &restart_metrics, best_restart_index) {
+    if let Ok(path) = env::var("PCV_DEBUG_RESTART_INIT_STATS_FILE") {
+        if let Err(message) = write_restart_init_stats(&path, &restart_init_stats) {
+            if !out_error.is_null() {
+                unsafe {
+                    *out_error = make_error(&message);
+                }
+            }
+            return 1;
+        }
+    }
+
+    if let Ok(path) = env::var("PCV_DEBUG_RESTART_TRACE_FILE") {
+        if let Err(message) = write_restart_iteration_traces(&path, &restart_outcomes) {
             if !out_error.is_null() {
                 unsafe {
                     *out_error = make_error(&message);
