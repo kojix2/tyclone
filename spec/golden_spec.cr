@@ -52,8 +52,11 @@ private def load_tsv(path : String)
   rows
 end
 
-private def expect_close(actual : Float64, expected : Float64, epsilon : Float64 = 1e-6)
-  (actual - expected).abs.should be <= epsilon
+private def expect_close(actual : Float64, expected : Float64, row_label : String, column_name : String, epsilon : Float64 = 1e-6)
+  diff = (actual - expected).abs
+  return if diff <= epsilon
+
+  raise "golden mismatch at #{row_label} #{column_name}: expected=#{expected} actual=#{actual} diff=#{diff} epsilon=#{epsilon}"
 end
 
 describe "golden output" do
@@ -70,13 +73,15 @@ describe "golden output" do
 
       actual_rows.size.should eq(expected_rows.size)
 
-      actual_rows.zip(expected_rows).each do |actual, expected|
+      actual_rows.zip(expected_rows).each_with_index do |(actual, expected), index|
+        row_label = "line #{index + 2} (mutation_id=#{expected[:mutation_id]}, sample_id=#{expected[:sample_id]}, cluster_id=#{expected[:cluster_id]})"
+
         actual[:mutation_id].should eq(expected[:mutation_id])
         actual[:sample_id].should eq(expected[:sample_id])
         actual[:cluster_id].should eq(expected[:cluster_id])
-        expect_close(actual[:cellular_prevalence], expected[:cellular_prevalence])
-        expect_close(actual[:cellular_prevalence_std], expected[:cellular_prevalence_std])
-        expect_close(actual[:cluster_assignment_prob], expected[:cluster_assignment_prob])
+        expect_close(actual[:cellular_prevalence], expected[:cellular_prevalence], row_label, "cellular_prevalence")
+        expect_close(actual[:cellular_prevalence_std], expected[:cellular_prevalence_std], row_label, "cellular_prevalence_std")
+        expect_close(actual[:cluster_assignment_prob], expected[:cluster_assignment_prob], row_label, "cluster_assignment_prob")
       end
     ensure
       File.delete(out_file) if File.exists?(out_file)
