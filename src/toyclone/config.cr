@@ -10,6 +10,11 @@ module Toyclone
     Version
   end
 
+  enum Engine
+    VI
+    MCMC
+  end
+
   class Config
     property action : Action
     property command : String
@@ -29,10 +34,23 @@ module Toyclone
     property restart_parallelism : Int32
     property? compress : Bool
     property help_message : String
+    property engine : Engine
+    property num_iters : Int32
+    property burnin : Int32
+    property thin : Int32
+    property alpha : Float64
+    property alpha_prior_shape : Float64
+    property alpha_prior_rate : Float64
+    property init_method : String
+    property base_measure_alpha : Float64
+    property base_measure_beta : Float64
+    property mh_step_size : Float64
+    property mh_precision_step : Float64
+    property mh_precision_proposal_precision : Float64
 
     def initialize
       @action = Action::Fit
-      @command = "fit"
+      @command = "fit-vi"
       @in_file = ""
       @out_file = ""
       @num_clusters = 10
@@ -49,6 +67,19 @@ module Toyclone
       @restart_parallelism = 1
       @compress = false
       @help_message = ""
+      @engine = Engine::VI
+      @num_iters = 1000
+      @burnin = 0
+      @thin = 1
+      @alpha = 1.0
+      @alpha_prior_shape = 1.0
+      @alpha_prior_rate = 0.001
+      @init_method = "disconnected"
+      @base_measure_alpha = 1.0
+      @base_measure_beta = 1.0
+      @mh_step_size = 0.01
+      @mh_precision_step = 0.0
+      @mh_precision_proposal_precision = 0.01
     end
   end
 end

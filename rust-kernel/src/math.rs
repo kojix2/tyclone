@@ -1,9 +1,6 @@
 #[allow(dead_code)]
 pub fn log_sum_exp(values: &[f64]) -> f64 {
-    let max_exp = values
-        .iter()
-        .copied()
-        .fold(f64::NEG_INFINITY, f64::max);
+    let max_exp = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
 
     if max_exp.is_infinite() {
         return max_exp;

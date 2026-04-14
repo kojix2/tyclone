@@ -28,10 +28,32 @@ lib LibPcv
     seed : UInt64
   end
 
+  struct PcvMcmcConfig
+    num_iters : Int32
+    burnin : Int32
+    thin : Int32
+    num_clusters : Int32
+    alpha : Float64
+    alpha_prior_shape : Float64
+    alpha_prior_rate : Float64
+    init_method : UInt8
+    base_measure_alpha : Float64
+    base_measure_beta : Float64
+    mh_step_size : Float64
+    mh_precision_step : Float64
+    mh_precision_proposal_precision : Float64
+    precision : Float64
+    density : UInt8
+    use_seed : UInt8
+    seed : UInt64
+    print_freq : Int32
+  end
+
   type PcvResult = Void
   type PcvError = Void
 
   fun pcv_fit = pcv_fit(config : PcvConfig*, rows : PcvRow*, rows_len : LibC::SizeT, num_mutations : LibC::SizeT, num_samples : LibC::SizeT, out_result : PcvResult**, out_error : PcvError**) : Int32
+  fun pcv_fit_mcmc = pcv_fit_mcmc(config : PcvMcmcConfig*, rows : PcvRow*, rows_len : LibC::SizeT, num_mutations : LibC::SizeT, num_samples : LibC::SizeT, out_result : PcvResult**, out_error : PcvError**) : Int32
   fun pcv_result_num_mutations = pcv_result_num_mutations(result : PcvResult*) : LibC::SizeT
   fun pcv_result_num_samples = pcv_result_num_samples(result : PcvResult*) : LibC::SizeT
   fun pcv_result_num_clusters = pcv_result_num_clusters(result : PcvResult*) : LibC::SizeT
@@ -107,6 +129,54 @@ module Toyclone
       error_ptr = Pointer(LibPcv::PcvError).null
 
       rc = LibPcv.pcv_fit(
+        pointerof(cfg),
+        rows.to_unsafe,
+        rows.size,
+        num_mutations,
+        num_samples,
+        pointerof(result_ptr),
+        pointerof(error_ptr)
+      )
+
+      if rc != 0
+        message = "Unknown kernel error"
+        unless error_ptr.null?
+          message_ptr = LibPcv.pcv_error_message(error_ptr)
+          message = String.new(message_ptr) unless message_ptr.null?
+          LibPcv.pcv_error_free(error_ptr)
+        end
+        raise KernelError.new(message)
+      end
+
+      KernelResult.new(result_ptr)
+    end
+
+    def self.fit_mcmc(config : Config, rows : Array(LibPcv::PcvRow), num_mutations : Int32, num_samples : Int32) : KernelResult
+      cfg = LibPcv::PcvMcmcConfig.new(
+        num_iters: config.num_iters,
+        burnin: config.burnin,
+        thin: config.thin,
+        num_clusters: config.num_clusters,
+        alpha: config.alpha,
+        alpha_prior_shape: config.alpha_prior_shape,
+        alpha_prior_rate: config.alpha_prior_rate,
+        init_method: (config.init_method == "connected" ? 1_u8 : 0_u8),
+        base_measure_alpha: config.base_measure_alpha,
+        base_measure_beta: config.base_measure_beta,
+        mh_step_size: config.mh_step_size,
+        mh_precision_step: config.mh_precision_step,
+        mh_precision_proposal_precision: config.mh_precision_proposal_precision,
+        precision: config.precision,
+        density: (config.density == Density::Binomial ? 0_u8 : 1_u8),
+        use_seed: config.seed.nil? ? 0_u8 : 1_u8,
+        seed: config.seed || 0_u64,
+        print_freq: config.print_freq
+      )
+
+      result_ptr = Pointer(LibPcv::PcvResult).null
+      error_ptr = Pointer(LibPcv::PcvError).null
+
+      rc = LibPcv.pcv_fit_mcmc(
         pointerof(cfg),
         rows.to_unsafe,
         rows.size,

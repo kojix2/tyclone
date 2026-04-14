@@ -1,12 +1,16 @@
-use std::ffi::{c_char, c_int, CString};
 use std::collections::{BTreeSet, HashMap};
 use std::env;
+use std::ffi::{c_char, c_int, CString};
 use std::fs;
 use std::ptr;
 
 use crate::inference::fit_variational_model;
+use crate::mcmc::fit_mcmc_model;
 use crate::preprocess::{build_log_p_data, build_log_p_data_parallel, get_ccf_grid};
-use crate::types::{DataPreprocessor, Density, PcvConfig, PcvError, PcvResult, PcvRow, Priors, VariationalParameters};
+use crate::types::{
+    DataPreprocessor, Density, PcvConfig, PcvError, PcvMcmcConfig, PcvResult, PcvRow, Priors,
+    VariationalParameters,
+};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use rayon::prelude::*;
@@ -62,11 +66,19 @@ struct RestartOutcome {
     var_params: VariationalParameters,
 }
 
-fn write_restart_metrics(path: &str, metrics: &[RestartMetric], best_restart_index: usize) -> Result<(), String> {
+fn write_restart_metrics(
+    path: &str,
+    metrics: &[RestartMetric],
+    best_restart_index: usize,
+) -> Result<(), String> {
     let mut lines = Vec::with_capacity(metrics.len() + 1);
     lines.push("restart,seed,final_elbo,used_clusters,is_best".to_string());
     for m in metrics {
-        let is_best = if m.restart_index == best_restart_index { 1 } else { 0 };
+        let is_best = if m.restart_index == best_restart_index {
+            1
+        } else {
+            0
+        };
         lines.push(format!(
             "{},{},{:.15},{},{}",
             m.restart_index, m.restart_seed, m.final_elbo, m.used_clusters, is_best
@@ -237,11 +249,11 @@ fn build_result_from_variational(
 #[cfg(test)]
 mod tests {
     use super::{
-        best_restart_index, build_result_from_variational, get_output_grid, pcv_error_free, pcv_error_message, pcv_fit,
-        pcv_result_cluster_sample_prevalence, pcv_result_cluster_sample_prevalence_std,
-        pcv_result_free, pcv_result_mutation_cluster_ids, pcv_result_mutation_cluster_probs,
-        pcv_result_num_clusters, pcv_result_num_mutations, pcv_result_num_samples, RestartMetric,
-        RestartOutcome,
+        best_restart_index, build_result_from_variational, get_output_grid, pcv_error_free,
+        pcv_error_message, pcv_fit, pcv_result_cluster_sample_prevalence,
+        pcv_result_cluster_sample_prevalence_std, pcv_result_free, pcv_result_mutation_cluster_ids,
+        pcv_result_mutation_cluster_probs, pcv_result_num_clusters, pcv_result_num_mutations,
+        pcv_result_num_samples, RestartMetric, RestartOutcome,
     };
     use crate::types::{PcvConfig, PcvError, PcvResult, PcvRow, VariationalParameters};
     use std::ffi::CStr;
@@ -282,15 +294,8 @@ mod tests {
     fn renumbers_used_clusters_sequentially() {
         let var_params = VariationalParameters::from_parts(
             vec![1.0, 1.0, 1.0],
-            vec![
-                0.9, 0.1,
-                0.8, 0.2,
-                0.6, 0.4,
-            ],
-            vec![
-                0.1, 0.8, 0.1,
-                0.2, 0.7, 0.1,
-            ],
+            vec![0.9, 0.1, 0.8, 0.2, 0.6, 0.4],
+            vec![0.1, 0.8, 0.1, 0.2, 0.7, 0.1],
             2,
             3,
             1,
@@ -325,7 +330,8 @@ mod tests {
         )
         .unwrap();
 
-        let result = build_result_from_variational(&var_params, &[1e-6, 0.5, 1.0 - 1e-6], 1, 1).unwrap();
+        let result =
+            build_result_from_variational(&var_params, &[1e-6, 0.5, 1.0 - 1e-6], 1, 1).unwrap();
         assert_eq!(result.cluster_sample_prevalence, vec![0.0]);
         assert_eq!(result.cluster_sample_prevalence_std, vec![0.0]);
     }
@@ -412,15 +418,7 @@ mod tests {
         let row = default_row();
         let mut out_error: *mut PcvError = ptr::null_mut();
 
-        let rc = pcv_fit(
-            &cfg,
-            &row,
-            1,
-            1,
-            1,
-            ptr::null_mut(),
-            &mut out_error,
-        );
+        let rc = pcv_fit(&cfg, &row, 1, 1, 1, ptr::null_mut(), &mut out_error);
 
         assert_eq!(rc, 1);
         assert!(!out_error.is_null());
@@ -440,34 +438,26 @@ mod tests {
         let mut out_result: *mut PcvResult = ptr::null_mut();
         let mut out_error: *mut PcvError = ptr::null_mut();
 
-        let rc_null_config = pcv_fit(
-            ptr::null(),
-            &row,
-            1,
-            1,
-            1,
-            &mut out_result,
-            &mut out_error,
-        );
+        let rc_null_config = pcv_fit(ptr::null(), &row, 1, 1, 1, &mut out_result, &mut out_error);
         assert_eq!(rc_null_config, 1);
         assert!(!out_error.is_null());
-        let msg1 = unsafe { CStr::from_ptr(pcv_error_message(out_error)).to_str().unwrap() };
+        let msg1 = unsafe {
+            CStr::from_ptr(pcv_error_message(out_error))
+                .to_str()
+                .unwrap()
+        };
         assert_eq!(msg1, "config or rows is null");
         pcv_error_free(out_error);
 
         out_error = ptr::null_mut();
-        let rc_null_rows = pcv_fit(
-            &cfg,
-            ptr::null(),
-            1,
-            1,
-            1,
-            &mut out_result,
-            &mut out_error,
-        );
+        let rc_null_rows = pcv_fit(&cfg, ptr::null(), 1, 1, 1, &mut out_result, &mut out_error);
         assert_eq!(rc_null_rows, 1);
         assert!(!out_error.is_null());
-        let msg2 = unsafe { CStr::from_ptr(pcv_error_message(out_error)).to_str().unwrap() };
+        let msg2 = unsafe {
+            CStr::from_ptr(pcv_error_message(out_error))
+                .to_str()
+                .unwrap()
+        };
         assert_eq!(msg2, "config or rows is null");
         pcv_error_free(out_error);
     }
@@ -582,7 +572,8 @@ pub extern "C" fn pcv_fit(
             Err(error) => {
                 if !out_error.is_null() {
                     unsafe {
-                        *out_error = make_error(&format!("failed to build rayon thread pool: {error}"));
+                        *out_error =
+                            make_error(&format!("failed to build rayon thread pool: {error}"));
                     }
                 }
                 return 1;
@@ -638,7 +629,11 @@ pub extern "C" fn pcv_fit(
         }
     };
 
-    let priors = match Priors::new(cfg.num_clusters as usize, cfg.num_grid_points as usize, cfg.mix_weight_prior) {
+    let priors = match Priors::new(
+        cfg.num_clusters as usize,
+        cfg.num_grid_points as usize,
+        cfg.mix_weight_prior,
+    ) {
         Ok(priors) => priors,
         Err(message) => {
             if !out_error.is_null() {
@@ -751,7 +746,10 @@ pub extern "C" fn pcv_fit(
         .collect::<Vec<_>>();
 
     if cfg.print_freq > 0 {
-        eprintln!("[toyclone] best_restart={} best_final_elbo={}", best_restart_index, best_elbo);
+        eprintln!(
+            "[toyclone] best_restart={} best_final_elbo={}",
+            best_restart_index, best_elbo
+        );
     }
 
     if let Ok(path) = env::var("PCV_DEBUG_RESTART_METRICS_FILE") {
@@ -767,7 +765,73 @@ pub extern "C" fn pcv_fit(
 
     let best_var_params = restart_outcomes.swap_remove(best_outcome_index).var_params;
 
-    let result = match build_result_from_variational(&best_var_params, &ccf_grid, num_mutations, num_samples) {
+    let result = match build_result_from_variational(
+        &best_var_params,
+        &ccf_grid,
+        num_mutations,
+        num_samples,
+    ) {
+        Ok(result) => result,
+        Err(message) => {
+            if !out_error.is_null() {
+                unsafe {
+                    *out_error = make_error(&message);
+                }
+            }
+            return 1;
+        }
+    };
+
+    unsafe {
+        *out_result = Box::into_raw(Box::new(result));
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn pcv_fit_mcmc(
+    config: *const PcvMcmcConfig,
+    rows: *const PcvRow,
+    rows_len: usize,
+    num_mutations: usize,
+    num_samples: usize,
+    out_result: *mut *mut PcvResult,
+    out_error: *mut *mut PcvError,
+) -> c_int {
+    if !out_error.is_null() {
+        unsafe {
+            *out_error = ptr::null_mut();
+        }
+    }
+    if out_result.is_null() {
+        if !out_error.is_null() {
+            unsafe {
+                *out_error = make_error("out_result is null");
+            }
+        }
+        return 1;
+    }
+    if config.is_null() || rows.is_null() {
+        if !out_error.is_null() {
+            unsafe {
+                *out_error = make_error("config or rows is null");
+            }
+        }
+        return 1;
+    }
+    if rows_len == 0 || num_mutations == 0 || num_samples == 0 {
+        if !out_error.is_null() {
+            unsafe {
+                *out_error = make_error("rows_len, num_mutations, num_samples must be > 0");
+            }
+        }
+        return 1;
+    }
+
+    let cfg = unsafe { &*config };
+    let input_rows = unsafe { std::slice::from_raw_parts(rows, rows_len) };
+
+    let result = match fit_mcmc_model(cfg, input_rows, num_mutations, num_samples) {
         Ok(result) => result,
         Err(message) => {
             if !out_error.is_null() {

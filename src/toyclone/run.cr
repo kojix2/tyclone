@@ -8,7 +8,12 @@ module Toyclone
       end
 
       indexed = Indexing.build(sanitized_rows)
-      result = Kernel.fit(config, indexed.rows, indexed.num_mutations, indexed.num_samples)
+      result = case config.engine
+               when Engine::MCMC
+                 Kernel.fit_mcmc(config, indexed.rows, indexed.num_mutations, indexed.num_samples)
+               else
+                 Kernel.fit(config, indexed.rows, indexed.num_mutations, indexed.num_samples)
+               end
 
       begin
         out_rows = ResultBuilder.build(indexed, result)

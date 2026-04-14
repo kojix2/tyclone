@@ -12,10 +12,19 @@ fn log_binomial_coefficient(n: i32, x: i32) -> f64 {
 }
 
 pub fn log_beta_binomial_pdf(n: i32, x: i32, a: f64, b: f64) -> f64 {
+    if a <= 0.0 || b <= 0.0 {
+        return f64::NEG_INFINITY;
+    }
     log_binomial_coefficient(n, x) + log_beta(a + x as f64, b + (n - x) as f64) - log_beta(a, b)
 }
 
 pub fn log_binomial_pdf(n: i32, x: i32, p: f64) -> f64 {
+    if p == 0.0 {
+        return if x == 0 { 0.0 } else { f64::NEG_INFINITY };
+    }
+    if p == 1.0 {
+        return if x == n { 0.0 } else { f64::NEG_INFINITY };
+    }
     log_binomial_coefficient(n, x) + (x as f64) * p.ln() + ((n - x) as f64) * (-p).ln_1p()
 }
 
@@ -59,7 +68,8 @@ pub fn log_pyclone_beta_binomial_pdf(data: &SampleDataPoint, f: f64, precision: 
         expected_vaf /= norm_const;
         let alpha = expected_vaf * precision;
         let beta = precision - alpha;
-        ll[c_idx] = data.log_pi[c_idx] + log_beta_binomial_pdf(data.a + data.b, data.b, alpha, beta);
+        ll[c_idx] =
+            data.log_pi[c_idx] + log_beta_binomial_pdf(data.a + data.b, data.b, alpha, beta);
     }
 
     log_sum_exp(&ll)
@@ -97,7 +107,10 @@ mod tests {
 
     fn approx_eq(left: f64, right: f64, tol: f64) {
         let delta = (left - right).abs();
-        assert!(delta < tol, "left={left}, right={right}, delta={delta}, tol={tol}");
+        assert!(
+            delta < tol,
+            "left={left}, right={right}, delta={delta}, tol={tol}"
+        );
     }
 
     #[test]
@@ -111,6 +124,20 @@ mod tests {
     fn beta_binomial_pdf_is_finite_for_valid_inputs() {
         let actual = log_beta_binomial_pdf(10, 5, 20.0, 20.0);
         assert!(actual.is_finite());
+    }
+
+    #[test]
+    fn beta_binomial_pdf_returns_negative_infinity_for_invalid_boundary_params() {
+        let actual = log_beta_binomial_pdf(10, 5, 0.0, 20.0);
+        assert!(actual.is_infinite() && actual.is_sign_negative());
+    }
+
+    #[test]
+    fn binomial_pdf_handles_zero_and_one_boundaries() {
+        assert_eq!(log_binomial_pdf(10, 0, 0.0), 0.0);
+        assert!(log_binomial_pdf(10, 1, 0.0).is_infinite());
+        assert_eq!(log_binomial_pdf(10, 10, 1.0), 0.0);
+        assert!(log_binomial_pdf(10, 9, 1.0).is_infinite());
     }
 
     #[test]

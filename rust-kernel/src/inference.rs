@@ -60,7 +60,11 @@ impl FitProfile {
     }
 }
 
-fn get_log_p_data_theta(theta: &[f64], var_params: &VariationalParameters, data_preproc: &DataPreprocessor) -> Vec<f64> {
+fn get_log_p_data_theta(
+    theta: &[f64],
+    var_params: &VariationalParameters,
+    data_preproc: &DataPreprocessor,
+) -> Vec<f64> {
     let contraction_axis_size = var_params.num_dims * var_params.num_grid_points;
     let mut reshaped_theta = vec![0.0; contraction_axis_size * var_params.num_clusters];
 
@@ -68,7 +72,8 @@ fn get_log_p_data_theta(theta: &[f64], var_params: &VariationalParameters, data_
         for dim_index in 0..var_params.num_dims {
             let row = grid_index * var_params.num_dims + dim_index;
             for cluster_index in 0..var_params.num_clusters {
-                let src = ((cluster_index * var_params.num_dims + dim_index) * var_params.num_grid_points)
+                let src = ((cluster_index * var_params.num_dims + dim_index)
+                    * var_params.num_grid_points)
                     + grid_index;
                 let dst = row * var_params.num_clusters + cluster_index;
                 reshaped_theta[dst] = theta[src];
@@ -82,14 +87,14 @@ fn get_log_p_data_theta(theta: &[f64], var_params: &VariationalParameters, data_
             .par_chunks_mut(var_params.num_clusters)
             .enumerate()
             .for_each(|(mutation_index, result_row)| {
-                let data_row = &data_preproc.z_update_data[
-                    mutation_index * contraction_axis_size..(mutation_index + 1) * contraction_axis_size
-                ];
+                let data_row = &data_preproc.z_update_data[mutation_index * contraction_axis_size
+                    ..(mutation_index + 1) * contraction_axis_size];
                 for cluster_index in 0..var_params.num_clusters {
                     let mut total = 0.0;
                     for contraction_index in 0..contraction_axis_size {
                         total += data_row[contraction_index]
-                            * reshaped_theta[contraction_index * var_params.num_clusters + cluster_index];
+                            * reshaped_theta
+                                [contraction_index * var_params.num_clusters + cluster_index];
                     }
                     result_row[cluster_index] = total;
                 }
@@ -99,8 +104,10 @@ fn get_log_p_data_theta(theta: &[f64], var_params: &VariationalParameters, data_
             for cluster_index in 0..var_params.num_clusters {
                 let mut total = 0.0;
                 for contraction_index in 0..contraction_axis_size {
-                    total += data_preproc.z_update_data[mutation_index * contraction_axis_size + contraction_index]
-                        * reshaped_theta[contraction_index * var_params.num_clusters + cluster_index];
+                    total += data_preproc.z_update_data
+                        [mutation_index * contraction_axis_size + contraction_index]
+                        * reshaped_theta
+                            [contraction_index * var_params.num_clusters + cluster_index];
                 }
                 result[mutation_index * var_params.num_clusters + cluster_index] = total;
             }
@@ -110,10 +117,14 @@ fn get_log_p_data_theta(theta: &[f64], var_params: &VariationalParameters, data_
     result
 }
 
-fn get_log_p_data_z(var_params: &VariationalParameters, data_preproc: &DataPreprocessor) -> Vec<f64> {
+fn get_log_p_data_z(
+    var_params: &VariationalParameters,
+    data_preproc: &DataPreprocessor,
+) -> Vec<f64> {
     let contraction_axis_size = var_params.num_dims * var_params.num_grid_points;
 
-    let mut result = vec![0.0; var_params.num_clusters * var_params.num_dims * var_params.num_grid_points];
+    let mut result =
+        vec![0.0; var_params.num_clusters * var_params.num_dims * var_params.num_grid_points];
 
     if data_preproc.use_parallel {
         result
@@ -123,8 +134,10 @@ fn get_log_p_data_z(var_params: &VariationalParameters, data_preproc: &DataPrepr
                 for (contraction_index, cell) in result_chunk.iter_mut().enumerate() {
                     let mut total = 0.0;
                     for data_point_index in 0..var_params.num_data_points {
-                        total += var_params.z[data_point_index * var_params.num_clusters + cluster_index]
-                            * data_preproc.theta_update_data[data_point_index * contraction_axis_size + contraction_index];
+                        total += var_params.z
+                            [data_point_index * var_params.num_clusters + cluster_index]
+                            * data_preproc.theta_update_data
+                                [data_point_index * contraction_axis_size + contraction_index];
                     }
                     *cell = total;
                 }
@@ -134,13 +147,17 @@ fn get_log_p_data_z(var_params: &VariationalParameters, data_preproc: &DataPrepr
             for contraction_index in 0..contraction_axis_size {
                 let mut total = 0.0;
                 for data_point_index in 0..var_params.num_data_points {
-                    total += var_params.z[data_point_index * var_params.num_clusters + cluster_index]
-                        * data_preproc.theta_update_data[data_point_index * contraction_axis_size + contraction_index];
+                    total += var_params.z
+                        [data_point_index * var_params.num_clusters + cluster_index]
+                        * data_preproc.theta_update_data
+                            [data_point_index * contraction_axis_size + contraction_index];
                 }
 
                 let dim_index = contraction_index / var_params.num_grid_points;
                 let grid_index = contraction_index % var_params.num_grid_points;
-                let dst = ((cluster_index * var_params.num_dims + dim_index) * var_params.num_grid_points) + grid_index;
+                let dst = ((cluster_index * var_params.num_dims + dim_index)
+                    * var_params.num_grid_points)
+                    + grid_index;
                 result[dst] = total;
             }
         }
@@ -187,7 +204,8 @@ impl VariationalParameters {
             return Err("simplex size must be > 0".to_string());
         }
 
-        let gamma = Gamma::new(1.0, 1.0).map_err(|_| "failed to initialize gamma sampler".to_string())?;
+        let gamma =
+            Gamma::new(1.0, 1.0).map_err(|_| "failed to initialize gamma sampler".to_string())?;
         let mut values = Vec::with_capacity(size);
         for _ in 0..size {
             values.push(gamma.sample(rng));
@@ -284,7 +302,9 @@ impl VariationalParameters {
             return Err("z length must equal num_data_points * num_clusters".to_string());
         }
         if theta.len() != num_clusters * num_dims * num_grid_points {
-            return Err("theta length must equal num_clusters * num_dims * num_grid_points".to_string());
+            return Err(
+                "theta length must equal num_clusters * num_dims * num_grid_points".to_string(),
+            );
         }
 
         Ok(Self {
@@ -317,7 +337,9 @@ impl VariationalParameters {
 
     pub fn update_z(&mut self, data_preproc: &DataPreprocessor) -> Result<(), String> {
         if data_preproc.z_update_shape != self.num_data_points {
-            return Err("data_preprocessor mutation dimension must equal num_data_points".to_string());
+            return Err(
+                "data_preprocessor mutation dimension must equal num_data_points".to_string(),
+            );
         }
 
         let mut new_z = get_log_p_data_theta(&self.theta, self, data_preproc);
@@ -351,7 +373,8 @@ impl VariationalParameters {
                 }
                 let row_norm = log_sum_exp(&new_z[row_start..row_end]);
                 for cluster_index in 0..self.num_clusters {
-                    self.z[row_start + cluster_index] = (new_z[row_start + cluster_index] - row_norm).exp();
+                    self.z[row_start + cluster_index] =
+                        (new_z[row_start + cluster_index] - row_norm).exp();
                 }
             }
         }
@@ -359,12 +382,18 @@ impl VariationalParameters {
         Ok(())
     }
 
-    pub fn update_theta(&mut self, priors: &Priors, data_preproc: &DataPreprocessor) -> Result<(), String> {
+    pub fn update_theta(
+        &mut self,
+        priors: &Priors,
+        data_preproc: &DataPreprocessor,
+    ) -> Result<(), String> {
         if priors.log_theta.len() != self.num_grid_points {
             return Err("priors.log_theta length must equal num_grid_points".to_string());
         }
         if data_preproc.theta_update_shape != (self.num_dims, self.num_grid_points) {
-            return Err("data_preprocessor theta shape must match variational dimensions".to_string());
+            return Err(
+                "data_preprocessor theta shape must match variational dimensions".to_string(),
+            );
         }
 
         let mut log_p_data_z = get_log_p_data_z(self, data_preproc);
@@ -385,7 +414,8 @@ impl VariationalParameters {
         } else {
             for cluster_index in 0..self.num_clusters {
                 for dim_index in 0..self.num_dims {
-                    let row_start = (cluster_index * self.num_dims + dim_index) * self.num_grid_points;
+                    let row_start =
+                        (cluster_index * self.num_dims + dim_index) * self.num_grid_points;
                     let row_end = row_start + self.num_grid_points;
 
                     for grid_index in 0..self.num_grid_points {
@@ -394,7 +424,8 @@ impl VariationalParameters {
 
                     let row_norm = log_sum_exp(&log_p_data_z[row_start..row_end]);
                     for grid_index in 0..self.num_grid_points {
-                        self.theta[row_start + grid_index] = (log_p_data_z[row_start + grid_index] - row_norm).exp();
+                        self.theta[row_start + grid_index] =
+                            (log_p_data_z[row_start + grid_index] - row_norm).exp();
                     }
                 }
             }
@@ -416,7 +447,8 @@ pub fn compute_e_log_p(
     let mut z_sums = vec![0.0; var_params.num_clusters];
     for data_point_index in 0..var_params.num_data_points {
         for cluster_index in 0..var_params.num_clusters {
-            z_sums[cluster_index] += var_params.z[data_point_index * var_params.num_clusters + cluster_index];
+            z_sums[cluster_index] +=
+                var_params.z[data_point_index * var_params.num_clusters + cluster_index];
         }
     }
 
@@ -429,7 +461,9 @@ pub fn compute_e_log_p(
     for cluster_index in 0..var_params.num_clusters {
         for dim_index in 0..var_params.num_dims {
             for grid_index in 0..var_params.num_grid_points {
-                let idx = ((cluster_index * var_params.num_dims + dim_index) * var_params.num_grid_points) + grid_index;
+                let idx = ((cluster_index * var_params.num_dims + dim_index)
+                    * var_params.num_grid_points)
+                    + grid_index;
                 log_p += var_params.theta[idx] * priors.log_theta[grid_index];
             }
         }
@@ -488,8 +522,14 @@ pub fn fit_variational_model(
     convergence_threshold: f64,
     max_iters: usize,
 ) -> Result<Vec<f64>, String> {
-    fit_variational_model_with_profile(priors, var_params, data_preproc, convergence_threshold, max_iters)
-        .map(|(trace, _)| trace)
+    fit_variational_model_with_profile(
+        priors,
+        var_params,
+        data_preproc,
+        convergence_threshold,
+        max_iters,
+    )
+    .map(|(trace, _)| trace)
 }
 
 pub fn fit_variational_model_with_profile(
@@ -549,12 +589,15 @@ pub fn fit_variational_model_with_profile(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::SeedableRng;
     use crate::types::LogLikelihoodTensor;
+    use rand::SeedableRng;
 
     fn approx_eq(left: f64, right: f64, tol: f64) {
         let delta = (left - right).abs();
-        assert!(delta < tol, "left={left}, right={right}, delta={delta}, tol={tol}");
+        assert!(
+            delta < tol,
+            "left={left}, right={right}, delta={delta}, tol={tol}"
+        );
     }
 
     #[test]
@@ -570,14 +613,10 @@ mod tests {
     #[test]
     fn update_pi_matches_row_sum_formula() {
         let theta = vec![1.0 / 5.0; 3 * 2 * 5];
-        let z = vec![
-            0.2, 0.3, 0.5,
-            0.1, 0.8, 0.1,
-            0.7, 0.2, 0.1,
-        ];
+        let z = vec![0.2, 0.3, 0.5, 0.1, 0.8, 0.1, 0.7, 0.2, 0.1];
 
-        let error = VariationalParameters::from_parts(vec![0.2, 0.2], theta, z, 3, 3, 2, 5)
-            .unwrap_err();
+        let error =
+            VariationalParameters::from_parts(vec![0.2, 0.2], theta, z, 3, 3, 2, 5).unwrap_err();
 
         assert_eq!(error, "pi length must equal num_clusters");
     }
@@ -586,22 +625,10 @@ mod tests {
     fn update_pi_computes_prior_plus_column_sums() {
         let priors = Priors::new(3, 5, 1.0).unwrap();
         let theta = vec![1.0 / 5.0; 3 * 2 * 5];
-        let z = vec![
-            0.2, 0.3, 0.5,
-            0.1, 0.8, 0.1,
-            0.7, 0.2, 0.1,
-        ];
+        let z = vec![0.2, 0.3, 0.5, 0.1, 0.8, 0.1, 0.7, 0.2, 0.1];
 
-        let mut var_params = VariationalParameters::from_parts(
-            vec![0.3, 0.3, 0.4],
-            theta,
-            z,
-            3,
-            3,
-            2,
-            5,
-        )
-        .unwrap();
+        let mut var_params =
+            VariationalParameters::from_parts(vec![0.3, 0.3, 0.4], theta, z, 3, 3, 2, 5).unwrap();
 
         var_params.update_pi(&priors).unwrap();
 
@@ -642,17 +669,17 @@ mod tests {
             num_samples: 2,
             num_grid_points: 3,
             values: vec![
-                1.0, 2.0, 3.0,
-                4.0, 5.0, 6.0,
-                7.0, 8.0, 9.0,
-                10.0, 11.0, 12.0,
+                1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0,
             ],
         };
 
         let preproc = DataPreprocessor::new(&tensor, false);
 
         assert_eq!(preproc.theta_update_data, tensor.values);
-        assert_eq!(preproc.z_update_data, vec![1.0, 4.0, 2.0, 5.0, 3.0, 6.0, 7.0, 10.0, 8.0, 11.0, 9.0, 12.0]);
+        assert_eq!(
+            preproc.z_update_data,
+            vec![1.0, 4.0, 2.0, 5.0, 3.0, 6.0, 7.0, 10.0, 8.0, 11.0, 9.0, 12.0]
+        );
         assert_eq!(preproc.theta_update_shape, (2, 3));
         assert_eq!(preproc.z_update_shape, 2);
     }
@@ -663,22 +690,12 @@ mod tests {
             num_mutations: 2,
             num_samples: 2,
             num_grid_points: 2,
-            values: vec![
-                1.0, 0.0,
-                0.0, 1.0,
-                0.5, 0.5,
-                0.5, 0.5,
-            ],
+            values: vec![1.0, 0.0, 0.0, 1.0, 0.5, 0.5, 0.5, 0.5],
         };
         let preproc = DataPreprocessor::new(&tensor, false);
         let mut var_params = VariationalParameters::from_parts(
             vec![1.5, 2.5],
-            vec![
-                0.7, 0.3,
-                0.4, 0.6,
-                0.2, 0.8,
-                0.5, 0.5,
-            ],
+            vec![0.7, 0.3, 0.4, 0.6, 0.2, 0.8, 0.5, 0.5],
             vec![0.5, 0.5, 0.5, 0.5],
             2,
             2,
@@ -702,23 +719,13 @@ mod tests {
             num_mutations: 2,
             num_samples: 2,
             num_grid_points: 2,
-            values: vec![
-                1.0, 0.0,
-                0.0, 1.0,
-                0.5, 0.5,
-                0.5, 0.5,
-            ],
+            values: vec![1.0, 0.0, 0.0, 1.0, 0.5, 0.5, 0.5, 0.5],
         };
         let preproc = DataPreprocessor::new(&tensor, false);
         let priors = Priors::new(2, 2, 1.0).unwrap();
         let mut var_params = VariationalParameters::from_parts(
             vec![1.5, 2.5],
-            vec![
-                0.7, 0.3,
-                0.4, 0.6,
-                0.2, 0.8,
-                0.5, 0.5,
-            ],
+            vec![0.7, 0.3, 0.4, 0.6, 0.2, 0.8, 0.5, 0.5],
             vec![0.6, 0.4, 0.3, 0.7],
             2,
             2,
@@ -745,12 +752,7 @@ mod tests {
             num_mutations: 2,
             num_samples: 2,
             num_grid_points: 2,
-            values: vec![
-                1.0, 0.0,
-                0.0, 1.0,
-                0.5, 0.5,
-                0.5, 0.5,
-            ],
+            values: vec![1.0, 0.0, 0.0, 1.0, 0.5, 0.5, 0.5, 0.5],
         };
         let preproc = DataPreprocessor::new(&tensor, false);
         let priors = Priors::new(2, 2, 1.0).unwrap();
@@ -766,14 +768,7 @@ mod tests {
             num_mutations: 3,
             num_samples: 2,
             num_grid_points: 2,
-            values: vec![
-                1.0, 0.0,
-                0.0, 1.0,
-                0.5, 0.5,
-                0.5, 0.5,
-                0.3, 0.7,
-                0.7, 0.3,
-            ],
+            values: vec![1.0, 0.0, 0.0, 1.0, 0.5, 0.5, 0.5, 0.5, 0.3, 0.7, 0.7, 0.3],
         };
         let preproc = DataPreprocessor::new(&tensor, false);
         let priors = Priors::new(2, 2, 1.0).unwrap();

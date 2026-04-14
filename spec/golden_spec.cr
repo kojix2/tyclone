@@ -5,7 +5,8 @@ require "./spec_helper"
 
 private def golden_config(in_file : String, out_file : String)
   config = Toyclone::Config.new
-  config.command = "fit"
+  config.command = "fit-vi"
+  config.engine = Toyclone::Engine::VI
   config.in_file = in_file
   config.out_file = out_file
   config.num_clusters = 4

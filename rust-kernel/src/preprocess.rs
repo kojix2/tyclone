@@ -199,7 +199,10 @@ fn validate_row_offsets(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_log_p_data, build_log_p_data_parallel, build_sample_data_point, get_ccf_grid, get_major_cn_prior};
+    use super::{
+        build_log_p_data, build_log_p_data_parallel, build_sample_data_point, get_ccf_grid,
+        get_major_cn_prior,
+    };
     use crate::types::{Density, PcvRow};
 
     fn approx_eq(left: f64, right: f64) {
@@ -401,8 +404,10 @@ mod tests {
         ];
 
         let grid = get_ccf_grid(5, 1e-6).unwrap();
-        let sequential = build_log_p_data(&rows, 2, 2, &grid, Density::BetaBinomial, 200.0).unwrap();
-        let parallel = build_log_p_data_parallel(&rows, 2, 2, &grid, Density::BetaBinomial, 200.0).unwrap();
+        let sequential =
+            build_log_p_data(&rows, 2, 2, &grid, Density::BetaBinomial, 200.0).unwrap();
+        let parallel =
+            build_log_p_data_parallel(&rows, 2, 2, &grid, Density::BetaBinomial, 200.0).unwrap();
 
         assert_eq!(sequential, parallel);
     }
