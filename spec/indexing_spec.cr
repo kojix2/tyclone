@@ -40,7 +40,7 @@ describe Tyclone::Indexing do
 
     it "copies FFI fields verbatim from InputRow" do
       # chrA_01/sample_a: mutation_index=0, sample_index=0, ref=20, alt=8, tc=0.8
-      matches = indexed.rows.select { |r| r.mutation_index == 0 && r.sample_index == 0 }
+      matches = indexed.rows.select { |row| row.mutation_index == 0 && row.sample_index == 0 }
       matches.size.should eq(1)
       ffi_row = matches.first
       ffi_row.ref_counts.should eq(20)
@@ -51,7 +51,7 @@ describe Tyclone::Indexing do
 
     it "sets correct mutation_index and sample_index in FFI rows" do
       # chrZ_99/sample_b: mutation_index=1, sample_index=1, ref=10, alt=5
-      matches = indexed.rows.select { |r| r.mutation_index == 1 && r.sample_index == 1 }
+      matches = indexed.rows.select { |row| row.mutation_index == 1 && row.sample_index == 1 }
       matches.size.should eq(1)
       ffi_row = matches.first
       ffi_row.ref_counts.should eq(10)

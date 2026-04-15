@@ -61,8 +61,8 @@ describe Tyclone::Output do
       tmp.close
       begin
         Tyclone::Output.write(path, [make_output_row], true)
-        content = File.open(path) do |f|
-          Compress::Gzip::Reader.open(f, &.gets_to_end)
+        content = File.open(path) do |file|
+          Compress::Gzip::Reader.open(file, &.gets_to_end)
         end
         content.should contain("mutation_id\tsample_id\tcluster_id")
         content.should contain("mut1\ts1\t0")

@@ -77,13 +77,13 @@ describe "fit-mcmc integration" do
       Tyclone::Run.execute(mcmc_config(in_file, out_file))
       rows = load_mcmc_rows(out_file)
 
-      mutation_ids = rows.map { |row| row[:mutation_id] }.uniq
-      sample_ids = rows.map { |row| row[:sample_id] }.uniq
+      mutation_ids = rows.map { |row| row[:mutation_id] }.uniq!
+      sample_ids = rows.map { |row| row[:sample_id] }.uniq!
 
       rows.should_not be_empty
       rows.size.should eq(mutation_ids.size * sample_ids.size)
 
-      cluster_ids = rows.map { |row| row[:cluster_id] }.uniq.sort
+      cluster_ids = rows.map { |row| row[:cluster_id] }.uniq!.sort!
       cluster_ids.should eq((0...cluster_ids.size).to_a)
 
       rows.each do |row|
@@ -167,8 +167,8 @@ describe "fit-mcmc integration" do
       rows_burnin.size.should eq(rows_noburnin.size)
 
       # But burn-in should generally produce more stable estimates (lower std)
-      std_burnin = rows_burnin.map { |r| r[:cellular_prevalence_std] }.reduce(0.0) { |sum, v| sum + v }
-      std_noburnin = rows_noburnin.map { |r| r[:cellular_prevalence_std] }.reduce(0.0) { |sum, v| sum + v }
+      std_burnin = rows_burnin.map { |row| row[:cellular_prevalence_std] }.reduce(0.0) { |sum, value| sum + value }
+      std_noburnin = rows_noburnin.map { |row| row[:cellular_prevalence_std] }.reduce(0.0) { |sum, value| sum + value }
 
       # Burn-in typically produces lower variance (but test allows for variation)
       (std_burnin / std_noburnin).should be < 1.5 # Burn-in should not be much worse
