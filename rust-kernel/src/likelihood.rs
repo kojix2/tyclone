@@ -75,6 +75,7 @@ pub fn log_pyclone_beta_binomial_pdf(data: &SampleDataPoint, f: f64, precision: 
     log_sum_exp(&ll)
 }
 
+#[allow(dead_code)]
 pub fn compute_likelihood_grid(
     data: &SampleDataPoint,
     ccf_grid: &[f64],
@@ -97,6 +98,33 @@ pub fn compute_likelihood_grid(
         .collect();
 
     Ok(grid)
+}
+
+pub fn compute_likelihood_grid_into(
+    data: &SampleDataPoint,
+    ccf_grid: &[f64],
+    density: Density,
+    precision: f64,
+    out: &mut [f64],
+) -> Result<(), String> {
+    if ccf_grid.is_empty() {
+        return Err("ccf_grid must not be empty".to_string());
+    }
+    if precision <= 0.0 {
+        return Err("precision must be > 0".to_string());
+    }
+    if out.len() != ccf_grid.len() {
+        return Err("out length must equal ccf_grid length".to_string());
+    }
+
+    for (index, &ccf) in ccf_grid.iter().enumerate() {
+        out[index] = match density {
+            Density::Binomial => log_pyclone_binomial_pdf(data, ccf),
+            Density::BetaBinomial => log_pyclone_beta_binomial_pdf(data, ccf, precision),
+        };
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

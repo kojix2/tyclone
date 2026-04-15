@@ -1,4 +1,4 @@
-use crate::likelihood::compute_likelihood_grid;
+use crate::likelihood::compute_likelihood_grid_into;
 use crate::types::{Density, LogLikelihoodTensor, MajorCnPrior, PcvRow, SampleDataPoint};
 use rayon::prelude::*;
 
@@ -105,13 +105,18 @@ pub fn build_log_p_data(
 
     let num_grid_points = ccf_grid.len();
     let mut values = vec![f64::NEG_INFINITY; num_mutations * num_samples * num_grid_points];
-    let row_offsets = validate_row_offsets(rows, num_mutations, num_samples)?;
+    let ordered_rows = validate_and_order_rows(rows, num_mutations, num_samples)?;
 
-    for (row, pair_offset) in row_offsets {
+    for (pair_offset, row) in ordered_rows.iter().enumerate() {
         let data = build_sample_data_point(&row)?;
-        let ll = compute_likelihood_grid(&data, ccf_grid, density, precision)?;
         let tensor_offset = pair_offset * num_grid_points;
-        values[tensor_offset..tensor_offset + num_grid_points].copy_from_slice(&ll);
+        compute_likelihood_grid_into(
+            &data,
+            ccf_grid,
+            density,
+            precision,
+            &mut values[tensor_offset..tensor_offset + num_grid_points],
+        )?;
     }
 
     Ok(LogLikelihoodTensor {
@@ -141,21 +146,15 @@ pub fn build_log_p_data_parallel(
     }
 
     let num_grid_points = ccf_grid.len();
-    let row_offsets = validate_row_offsets(rows, num_mutations, num_samples)?;
-    let ll_results: Result<Vec<(usize, Vec<f64>)>, String> = row_offsets
-        .into_par_iter()
-        .map(|(row, pair_offset)| {
-            let data = build_sample_data_point(&row)?;
-            let ll = compute_likelihood_grid(&data, ccf_grid, density, precision)?;
-            Ok((pair_offset, ll))
-        })
-        .collect();
-
+    let ordered_rows = validate_and_order_rows(rows, num_mutations, num_samples)?;
     let mut values = vec![f64::NEG_INFINITY; num_mutations * num_samples * num_grid_points];
-    for (pair_offset, ll) in ll_results? {
-        let tensor_offset = pair_offset * num_grid_points;
-        values[tensor_offset..tensor_offset + num_grid_points].copy_from_slice(&ll);
-    }
+    ordered_rows
+        .par_iter()
+        .zip(values.par_chunks_mut(num_grid_points))
+        .try_for_each(|(row, chunk)| -> Result<(), String> {
+            let data = build_sample_data_point(row)?;
+            compute_likelihood_grid_into(&data, ccf_grid, density, precision, chunk)
+        })?;
 
     Ok(LogLikelihoodTensor {
         num_mutations,
@@ -165,13 +164,26 @@ pub fn build_log_p_data_parallel(
     })
 }
 
-fn validate_row_offsets(
+fn validate_and_order_rows(
     rows: &[PcvRow],
     num_mutations: usize,
     num_samples: usize,
-) -> Result<Vec<(PcvRow, usize)>, String> {
+) -> Result<Vec<PcvRow>, String> {
     let mut seen = vec![false; num_mutations * num_samples];
-    let mut row_offsets = Vec::with_capacity(rows.len());
+    let mut ordered_rows = vec![
+        PcvRow {
+            mutation_index: 0,
+            sample_index: 0,
+            ref_counts: 0,
+            alt_counts: 0,
+            major_cn: 0,
+            minor_cn: 0,
+            normal_cn: 0,
+            tumour_content: 0.0,
+            error_rate: 0.0,
+        };
+        rows.len()
+    ];
 
     for row in rows {
         if row.mutation_index < 0 || row.sample_index < 0 {
@@ -191,10 +203,10 @@ fn validate_row_offsets(
         }
         seen[pair_offset] = true;
 
-        row_offsets.push((*row, pair_offset));
+        ordered_rows[pair_offset] = *row;
     }
 
-    Ok(row_offsets)
+    Ok(ordered_rows)
 }
 
 #[cfg(test)]

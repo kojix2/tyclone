@@ -104,6 +104,7 @@ impl FitDetailProfile {
 pub(crate) struct InferenceScratch {
     reshaped_theta: Vec<f64>,
     transposed_z: Vec<f64>,
+    z_sums: Vec<f64>,
     log_p_data_theta: Vec<f64>,
     log_p_data_z: Vec<f64>,
 }
@@ -112,9 +113,10 @@ impl InferenceScratch {
     fn new(var_params: &VariationalParameters, data_preproc: &DataPreprocessor) -> Self {
         let contraction_axis_size = var_params.num_dims * var_params.num_grid_points;
 
-        Self {
+        let mut scratch = Self {
             reshaped_theta: vec![0.0; contraction_axis_size * var_params.num_clusters],
             transposed_z: vec![0.0; var_params.num_data_points * var_params.num_clusters],
+            z_sums: vec![0.0; var_params.num_clusters],
             log_p_data_theta: vec![0.0; data_preproc.z_update_shape * var_params.num_clusters],
             log_p_data_z: vec![
                 0.0;
@@ -122,6 +124,21 @@ impl InferenceScratch {
                     * var_params.num_dims
                     * var_params.num_grid_points
             ],
+        };
+        refresh_z_views(var_params, &mut scratch);
+        scratch
+    }
+}
+
+fn refresh_z_views(var_params: &VariationalParameters, scratch: &mut InferenceScratch) {
+    scratch.z_sums.fill(0.0);
+    for data_point_index in 0..var_params.num_data_points {
+        let src_offset = data_point_index * var_params.num_clusters;
+        for cluster_index in 0..var_params.num_clusters {
+            let value = var_params.z[src_offset + cluster_index];
+            scratch.transposed_z[cluster_index * var_params.num_data_points + data_point_index] =
+                value;
+            scratch.z_sums[cluster_index] += value;
         }
     }
 }
@@ -261,13 +278,6 @@ fn fill_log_p_data_z<'a>(
     scratch: &'a mut InferenceScratch,
 ) -> &'a mut [f64] {
     let contraction_axis_size = var_params.num_dims * var_params.num_grid_points;
-    for data_point_index in 0..var_params.num_data_points {
-        let src_offset = data_point_index * var_params.num_clusters;
-        for cluster_index in 0..var_params.num_clusters {
-            scratch.transposed_z[cluster_index * var_params.num_data_points + data_point_index] =
-                var_params.z[src_offset + cluster_index];
-        }
-    }
 
     let transposed_z = &scratch.transposed_z;
     let result = &mut scratch.log_p_data_z;
@@ -541,6 +551,7 @@ impl VariationalParameters {
         }
 
         let update_z_normalize = started.elapsed();
+        refresh_z_views(self, scratch);
         if let Some(detail) = detail {
             detail.update_z_contract += update_z_contract;
             detail.update_z_normalize += update_z_normalize;
@@ -646,25 +657,11 @@ fn compute_e_log_p_with_profile(
     let pi_sum = var_params.pi.iter().sum::<f64>();
     let psi_sum = digamma(pi_sum);
     let started = Instant::now();
-    for data_point_index in 0..var_params.num_data_points {
-        let src_offset = data_point_index * var_params.num_clusters;
-        for cluster_index in 0..var_params.num_clusters {
-            scratch.transposed_z[cluster_index * var_params.num_data_points + data_point_index] =
-                var_params.z[src_offset + cluster_index];
-        }
-    }
-
-    let mut z_sums = vec![0.0; var_params.num_clusters];
-    for cluster_index in 0..var_params.num_clusters {
-        let z_row = &scratch.transposed_z[cluster_index * var_params.num_data_points
-            ..(cluster_index + 1) * var_params.num_data_points];
-        z_sums[cluster_index] = z_row.iter().sum();
-    }
     let e_log_p_z_sums = started.elapsed();
 
     let started = Instant::now();
     for cluster_index in 0..var_params.num_clusters {
-        let p_pi_z_term = priors.pi[cluster_index] + z_sums[cluster_index] - 1.0;
+        let p_pi_z_term = priors.pi[cluster_index] + scratch.z_sums[cluster_index] - 1.0;
         let pi_psi_term = digamma(var_params.pi[cluster_index]) - psi_sum;
         log_p += p_pi_z_term * pi_psi_term;
     }
