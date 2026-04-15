@@ -95,6 +95,7 @@ VI-only:
 - `--precision`: beta-binomial precision
 - `--kernel-threads`: Rust kernel parallelism
 - `--restart-parallelism`: outer restart parallelism
+- `--debug-init-file`: debug-only JSON file with `pi`, `theta`, `z` arrays for same-initial-state validation
 
 MCMC-only:
 
@@ -135,6 +136,20 @@ This prints aggregated timings to stderr for:
 - `update_pi`
 - `update_theta`
 - iterative ELBO recomputation
+
+Debug-only initial value injection:
+
+```bash
+./bin/tyclone fit-vi -i ../pyclone-vi/examples/synthetic.tsv -o out.tsv -c 4 -g 21 -r 1 --debug-init-file=init.json --print-freq=0
+```
+
+The JSON file must contain flat `pi`, `theta`, and `z` arrays matching:
+
+- `pi`: `num_clusters`
+- `theta`: `num_clusters * num_samples * num_grid_points`
+- `z`: `num_mutations * num_clusters`
+
+This hook is intended for implementation comparison and fairness checks, not normal runs.
 
 ## Current status
 

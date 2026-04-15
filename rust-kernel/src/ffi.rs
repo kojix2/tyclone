@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::{c_char, c_int, CString};
 use std::ptr;
+use std::{env, fs};
 
 use crate::inference::fit_variational_model;
 use crate::mcmc::fit_mcmc_model;
@@ -14,7 +15,17 @@ use rand::Rng;
 use rand::SeedableRng;
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
+use serde::Deserialize;
 use std::time::{Duration, Instant};
+
+const DEBUG_INIT_FILE_ENV: &str = "PCV_DEBUG_INIT_FILE";
+
+#[derive(Debug, Deserialize)]
+struct DebugInitConfig {
+    pi: Vec<f64>,
+    theta: Vec<f64>,
+    z: Vec<f64>,
+}
 
 #[derive(Default, Debug, Clone, PartialEq)]
 struct KernelProfile {
@@ -149,6 +160,61 @@ fn run_restart_with_rng(
         },
         var_params,
     })
+}
+
+fn run_restart_with_var_params(
+    restart_index: usize,
+    restart_seed: u64,
+    mut var_params: VariationalParameters,
+    priors: &Priors,
+    data_preproc: &DataPreprocessor,
+    convergence_threshold: f64,
+    max_iters: usize,
+) -> Result<RestartOutcome, String> {
+    let trace = fit_variational_model(
+        priors,
+        &mut var_params,
+        data_preproc,
+        convergence_threshold,
+        max_iters,
+    )?;
+
+    let final_elbo = *trace.last().unwrap_or(&f64::NEG_INFINITY);
+    let used_clusters = num_used_clusters(&var_params);
+
+    Ok(RestartOutcome {
+        metric: RestartMetric {
+            restart_index,
+            restart_seed,
+            final_elbo,
+            used_clusters,
+        },
+        var_params,
+    })
+}
+
+fn load_debug_init_config(
+    path: &str,
+    num_mutations: usize,
+    num_samples: usize,
+    num_clusters: usize,
+    num_grid_points: usize,
+) -> Result<VariationalParameters, String> {
+    let raw = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read {DEBUG_INIT_FILE_ENV} file {path}: {error}"))?;
+    let parsed: DebugInitConfig = serde_json::from_str(&raw)
+        .map_err(|error| format!("failed to parse {DEBUG_INIT_FILE_ENV} JSON {path}: {error}"))?;
+
+    VariationalParameters::from_parts(
+        parsed.pi,
+        parsed.theta,
+        parsed.z,
+        num_mutations,
+        num_clusters,
+        num_samples,
+        num_grid_points,
+    )
+    .map_err(|error| format!("invalid {DEBUG_INIT_FILE_ENV} contents: {error}"))
 }
 
 fn run_restart_seeded(
@@ -577,7 +643,7 @@ pub extern "C" fn pcv_fit(
 
     let cfg = unsafe { &*config };
     let input_rows = unsafe { std::slice::from_raw_parts(rows, rows_len) };
-    let profiling_enabled = std::env::var_os("PCV_PROFILE").is_some();
+    let profiling_enabled = env::var_os("PCV_PROFILE").is_some();
     let total_started = Instant::now();
     let mut kernel_profile = KernelProfile::default();
     let density = match Density::try_from(cfg.density) {
@@ -745,7 +811,49 @@ pub extern "C" fn pcv_fit(
         rand::random::<u64>()
     };
 
+    let debug_init_path = env::var(DEBUG_INIT_FILE_ENV).ok().filter(|value| !value.is_empty());
+    let debug_init_var_params = match debug_init_path.as_deref() {
+        Some(path) => match load_debug_init_config(
+            path,
+            log_p_data.num_mutations,
+            log_p_data.num_samples,
+            cfg.num_clusters as usize,
+            cfg.num_grid_points as usize,
+        ) {
+            Ok(var_params) => Some(var_params),
+            Err(message) => {
+                if !out_error.is_null() {
+                    unsafe {
+                        *out_error = make_error(&message);
+                    }
+                }
+                return 1;
+            }
+        },
+        None => None,
+    };
+
     let run_all_restarts = || -> Result<Vec<RestartOutcome>, String> {
+        if let Some(var_params) = debug_init_var_params.clone() {
+            if cfg.num_restarts != 1 {
+                return Err(format!(
+                    "{DEBUG_INIT_FILE_ENV} requires num_restarts=1, got {}",
+                    cfg.num_restarts
+                ));
+            }
+
+            return run_restart_with_var_params(
+                0,
+                base_seed,
+                var_params,
+                &priors,
+                &data_preproc,
+                cfg.convergence_threshold,
+                cfg.max_iters as usize,
+            )
+            .map(|outcome| vec![outcome]);
+        }
+
         let restart_range = 0..(cfg.num_restarts as usize);
 
         if !enable_restart_parallel {

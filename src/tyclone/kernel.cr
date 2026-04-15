@@ -139,6 +139,8 @@ module Tyclone
   end
 
   module Kernel
+    private DEBUG_INIT_ENV = "PCV_DEBUG_INIT_FILE"
+
     def self.fit(config : Config, rows : Array(LibPcv::PcvRow), num_mutations : Int32, num_samples : Int32) : KernelResult
       cfg = LibPcv::PcvConfig.new(
         num_clusters: config.num_clusters,
@@ -159,27 +161,40 @@ module Tyclone
       result_ptr = Pointer(LibPcv::PcvResult).null
       error_ptr = Pointer(LibPcv::PcvError).null
 
-      rc = LibPcv.pcv_fit(
-        pointerof(cfg),
-        rows.to_unsafe,
-        rows.size,
-        num_mutations,
-        num_samples,
-        pointerof(result_ptr),
-        pointerof(error_ptr)
-      )
-
-      if rc != 0
-        message = "Unknown kernel error"
-        unless error_ptr.null?
-          message_ptr = LibPcv.pcv_error_message(error_ptr)
-          message = String.new(message_ptr) unless message_ptr.null?
-          LibPcv.pcv_error_free(error_ptr)
-        end
-        raise KernelError.new(message)
+      previous_debug_init = ENV[DEBUG_INIT_ENV]?
+      if !config.debug_init_file.empty?
+        ENV[DEBUG_INIT_ENV] = config.debug_init_file
       end
 
-      KernelResult.new(result_ptr)
+      begin
+        rc = LibPcv.pcv_fit(
+          pointerof(cfg),
+          rows.to_unsafe,
+          rows.size,
+          num_mutations,
+          num_samples,
+          pointerof(result_ptr),
+          pointerof(error_ptr)
+        )
+
+        if rc != 0
+          message = "Unknown kernel error"
+          unless error_ptr.null?
+            message_ptr = LibPcv.pcv_error_message(error_ptr)
+            message = String.new(message_ptr) unless message_ptr.null?
+            LibPcv.pcv_error_free(error_ptr)
+          end
+          raise KernelError.new(message)
+        end
+
+        KernelResult.new(result_ptr)
+      ensure
+        if previous_debug_init
+          ENV[DEBUG_INIT_ENV] = previous_debug_init
+        else
+          ENV.delete(DEBUG_INIT_ENV)
+        end
+      end
     end
 
     def self.fit_mcmc(config : Config, rows : Array(LibPcv::PcvRow), num_mutations : Int32, num_samples : Int32) : KernelResult

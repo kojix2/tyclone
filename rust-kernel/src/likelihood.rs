@@ -1,6 +1,5 @@
 use statrs::function::gamma::ln_gamma;
 
-use crate::math::log_sum_exp;
 use crate::types::{Density, SampleDataPoint};
 
 fn log_beta(a: f64, b: f64) -> f64 {
@@ -31,7 +30,8 @@ pub fn log_binomial_pdf(n: i32, x: i32, p: f64) -> f64 {
 pub fn log_pyclone_binomial_pdf(data: &SampleDataPoint, f: f64) -> f64 {
     let t = data.t;
     let population_prior = [1.0 - t, t * (1.0 - f), t * f];
-    let mut ll = vec![f64::NEG_INFINITY; data.cn.len()];
+    let mut max_ll = f64::NEG_INFINITY;
+    let mut exp_sum = 0.0;
 
     for (c_idx, cn) in data.cn.iter().enumerate() {
         let mut expected_vaf = 0.0;
@@ -44,16 +44,31 @@ pub fn log_pyclone_binomial_pdf(data: &SampleDataPoint, f: f64) -> f64 {
         }
 
         expected_vaf /= norm_const;
-        ll[c_idx] = data.log_pi[c_idx] + log_binomial_pdf(data.a + data.b, data.b, expected_vaf);
+        let ll = data.log_pi[c_idx] + log_binomial_pdf(data.a + data.b, data.b, expected_vaf);
+        if ll > max_ll {
+            exp_sum = if max_ll.is_infinite() {
+                1.0
+            } else {
+                exp_sum * (max_ll - ll).exp() + 1.0
+            };
+            max_ll = ll;
+        } else {
+            exp_sum += (ll - max_ll).exp();
+        }
     }
 
-    log_sum_exp(&ll)
+    if max_ll.is_infinite() {
+        max_ll
+    } else {
+        max_ll + exp_sum.ln()
+    }
 }
 
 pub fn log_pyclone_beta_binomial_pdf(data: &SampleDataPoint, f: f64, precision: f64) -> f64 {
     let t = data.t;
     let population_prior = [1.0 - t, t * (1.0 - f), t * f];
-    let mut ll = vec![f64::NEG_INFINITY; data.cn.len()];
+    let mut max_ll = f64::NEG_INFINITY;
+    let mut exp_sum = 0.0;
 
     for (c_idx, cn) in data.cn.iter().enumerate() {
         let mut expected_vaf = 0.0;
@@ -68,11 +83,24 @@ pub fn log_pyclone_beta_binomial_pdf(data: &SampleDataPoint, f: f64, precision: 
         expected_vaf /= norm_const;
         let alpha = expected_vaf * precision;
         let beta = precision - alpha;
-        ll[c_idx] =
-            data.log_pi[c_idx] + log_beta_binomial_pdf(data.a + data.b, data.b, alpha, beta);
+        let ll = data.log_pi[c_idx] + log_beta_binomial_pdf(data.a + data.b, data.b, alpha, beta);
+        if ll > max_ll {
+            exp_sum = if max_ll.is_infinite() {
+                1.0
+            } else {
+                exp_sum * (max_ll - ll).exp() + 1.0
+            };
+            max_ll = ll;
+        } else {
+            exp_sum += (ll - max_ll).exp();
+        }
     }
 
-    log_sum_exp(&ll)
+    if max_ll.is_infinite() {
+        max_ll
+    } else {
+        max_ll + exp_sum.ln()
+    }
 }
 
 #[allow(dead_code)]
