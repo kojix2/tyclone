@@ -3,7 +3,7 @@ mod sampler;
 mod shared;
 mod state;
 
-use crate::types::{Density, McmcTrace, PcvMcmcConfig, PcvResult, PcvRow};
+use crate::types::{Density, DpState, McmcTrace, PcvMcmcConfig, PcvResult, PcvRow};
 use postprocess::build_result_from_trace;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -15,6 +15,7 @@ pub fn fit_mcmc_model(
     rows: &[PcvRow],
     num_mutations: usize,
     num_samples: usize,
+    initial_state: Option<DpState>,
 ) -> Result<PcvResult, String> {
     if cfg.num_iters <= 0 {
         return Err("num_iters must be > 0".to_string());
@@ -39,7 +40,10 @@ pub fn fit_mcmc_model(
     } else {
         StdRng::seed_from_u64(rand::random::<u64>())
     };
-    let mut state = initialize_state(cfg, num_mutations, num_samples, &observed_phi, &mut rng)?;
+    let mut state = match initial_state {
+        Some(s) => s,
+        None => initialize_state(cfg, num_mutations, num_samples, &observed_phi, &mut rng)?,
+    };
 
     let mut trace = McmcTrace {
         co_cluster_counts: vec![0_u32; num_mutations * num_mutations],

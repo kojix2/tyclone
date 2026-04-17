@@ -7,8 +7,8 @@ use crate::inference::fit_variational_model;
 use crate::mcmc::fit_mcmc_model;
 use crate::preprocess::{build_log_p_data, build_log_p_data_parallel, get_ccf_grid};
 use crate::types::{
-    DataPreprocessor, Density, PcvConfig, PcvError, PcvMcmcConfig, PcvResult, PcvRow, Priors,
-    VariationalParameters,
+    ClusterAtom, DataPreprocessor, Density, DpState, PcvConfig, PcvError, PcvMcmcConfig,
+    PcvResult, PcvRow, Priors, VariationalParameters,
 };
 use rand::rngs::StdRng;
 use rand::Rng;
@@ -1096,6 +1096,130 @@ pub extern "C" fn pcv_fit_mcmc(
     out_result: *mut *mut PcvResult,
     out_error: *mut *mut PcvError,
 ) -> c_int {
+    pcv_fit_mcmc_with_init(
+        config,
+        rows,
+        rows_len,
+        num_mutations,
+        num_samples,
+        ptr::null(),
+        0,
+        ptr::null(),
+        0,
+        0,
+        0.0,
+        0.0,
+        out_result,
+        out_error,
+    )
+}
+
+fn decode_compat_mcmc_state(
+    num_mutations: usize,
+    num_samples: usize,
+    compat_cluster_id: *const i32,
+    compat_cluster_id_len: usize,
+    compat_atoms_phi: *const f64,
+    compat_atoms_phi_len: usize,
+    compat_num_atoms: usize,
+    compat_alpha: f64,
+    compat_precision: f64,
+) -> Result<Option<DpState>, String> {
+    let any_compat = !compat_cluster_id.is_null()
+        || !compat_atoms_phi.is_null()
+        || compat_cluster_id_len > 0
+        || compat_atoms_phi_len > 0
+        || compat_num_atoms > 0;
+
+    if !any_compat {
+        return Ok(None);
+    }
+
+    if compat_cluster_id.is_null() || compat_atoms_phi.is_null() {
+        return Err(
+            "compat mcmc init pointers must be non-null when compat init is provided".to_string(),
+        );
+    }
+    if compat_cluster_id_len != num_mutations {
+        return Err(format!(
+            "compat mcmc cluster_id length mismatch: got {}, expected {}",
+            compat_cluster_id_len, num_mutations
+        ));
+    }
+    let expected_phi_len = compat_num_atoms
+        .checked_mul(num_samples)
+        .ok_or_else(|| "compat mcmc atoms_phi length overflow".to_string())?;
+    if compat_atoms_phi_len != expected_phi_len {
+        return Err(format!(
+            "compat mcmc atoms_phi length mismatch: got {}, expected {}",
+            compat_atoms_phi_len, expected_phi_len
+        ));
+    }
+    if compat_alpha <= 0.0 {
+        return Err("compat mcmc alpha must be > 0".to_string());
+    }
+    if compat_precision <= 0.0 {
+        return Err("compat mcmc precision must be > 0".to_string());
+    }
+
+    let cluster_id_slice =
+        unsafe { std::slice::from_raw_parts(compat_cluster_id, compat_cluster_id_len) };
+    let phi_slice = unsafe { std::slice::from_raw_parts(compat_atoms_phi, compat_atoms_phi_len) };
+
+    let cluster_id: Vec<usize> = cluster_id_slice
+        .iter()
+        .map(|&v| {
+            if v < 0 {
+                Err(format!("compat mcmc cluster_id contains negative value: {}", v))
+            } else {
+                Ok(v as usize)
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    for &id in &cluster_id {
+        if id >= compat_num_atoms {
+            return Err(format!(
+                "compat mcmc cluster_id {} out of range (num_atoms={})",
+                id, compat_num_atoms
+            ));
+        }
+    }
+
+    let atoms: Vec<ClusterAtom> = (0..compat_num_atoms)
+        .map(|atom_idx| {
+            let start = atom_idx * num_samples;
+            ClusterAtom {
+                phi: phi_slice[start..start + num_samples].to_vec(),
+            }
+        })
+        .collect();
+
+    Ok(Some(DpState {
+        cluster_id,
+        atoms,
+        alpha: compat_alpha,
+        precision: compat_precision,
+    }))
+}
+
+#[no_mangle]
+pub extern "C" fn pcv_fit_mcmc_with_init(
+    config: *const PcvMcmcConfig,
+    rows: *const PcvRow,
+    rows_len: usize,
+    num_mutations: usize,
+    num_samples: usize,
+    compat_cluster_id: *const i32,
+    compat_cluster_id_len: usize,
+    compat_atoms_phi: *const f64,
+    compat_atoms_phi_len: usize,
+    compat_num_atoms: usize,
+    compat_alpha: f64,
+    compat_precision: f64,
+    out_result: *mut *mut PcvResult,
+    out_error: *mut *mut PcvError,
+) -> c_int {
     if !out_error.is_null() {
         unsafe {
             *out_error = ptr::null_mut();
@@ -1129,7 +1253,29 @@ pub extern "C" fn pcv_fit_mcmc(
     let cfg = unsafe { &*config };
     let input_rows = unsafe { std::slice::from_raw_parts(rows, rows_len) };
 
-    let result = match fit_mcmc_model(cfg, input_rows, num_mutations, num_samples) {
+    let initial_state = match decode_compat_mcmc_state(
+        num_mutations,
+        num_samples,
+        compat_cluster_id,
+        compat_cluster_id_len,
+        compat_atoms_phi,
+        compat_atoms_phi_len,
+        compat_num_atoms,
+        compat_alpha,
+        compat_precision,
+    ) {
+        Ok(s) => s,
+        Err(message) => {
+            if !out_error.is_null() {
+                unsafe {
+                    *out_error = make_error(&message);
+                }
+            }
+            return 1;
+        }
+    };
+
+    let result = match fit_mcmc_model(cfg, input_rows, num_mutations, num_samples, initial_state) {
         Ok(result) => result,
         Err(message) => {
             if !out_error.is_null() {

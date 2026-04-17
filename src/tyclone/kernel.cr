@@ -58,6 +58,7 @@ lib LibPcv
   fun pcv_fit = pcv_fit(config : PcvConfig*, rows : PcvRow*, rows_len : LibC::SizeT, num_mutations : LibC::SizeT, num_samples : LibC::SizeT, out_result : PcvResult**, out_error : PcvError**) : Int32
   fun pcv_fit_with_init = pcv_fit_with_init(config : PcvConfig*, rows : PcvRow*, rows_len : LibC::SizeT, num_mutations : LibC::SizeT, num_samples : LibC::SizeT, compat_pi : Float64*, compat_pi_len : LibC::SizeT, compat_theta : Float64*, compat_theta_len : LibC::SizeT, compat_z : Float64*, compat_z_len : LibC::SizeT, out_result : PcvResult**, out_error : PcvError**) : Int32
   fun pcv_fit_mcmc = pcv_fit_mcmc(config : PcvMcmcConfig*, rows : PcvRow*, rows_len : LibC::SizeT, num_mutations : LibC::SizeT, num_samples : LibC::SizeT, out_result : PcvResult**, out_error : PcvError**) : Int32
+  fun pcv_fit_mcmc_with_init = pcv_fit_mcmc_with_init(config : PcvMcmcConfig*, rows : PcvRow*, rows_len : LibC::SizeT, num_mutations : LibC::SizeT, num_samples : LibC::SizeT, compat_cluster_id : Int32*, compat_cluster_id_len : LibC::SizeT, compat_atoms_phi : Float64*, compat_atoms_phi_len : LibC::SizeT, compat_num_atoms : LibC::SizeT, compat_alpha : Float64, compat_precision : Float64, out_result : PcvResult**, out_error : PcvError**) : Int32
   fun pcv_result_num_mutations = pcv_result_num_mutations(result : PcvResult*) : LibC::SizeT
   fun pcv_result_num_samples = pcv_result_num_samples(result : PcvResult*) : LibC::SizeT
   fun pcv_result_num_clusters = pcv_result_num_clusters(result : PcvResult*) : LibC::SizeT
@@ -143,8 +144,10 @@ module Tyclone
 
   module Kernel
     private record CompatInitBuffers, pi : Array(Float64), theta : Array(Float64), z : Array(Float64)
+    private record McmcCompatInitBuffers, cluster_id : Array(Int32), atoms_phi : Array(Float64), num_atoms : Int32, alpha : Float64, precision : Float64
 
-    private PYTHON_INIT_CODE = {{ read_file("#{__DIR__}/python_init.py") }}
+    private PYTHON_INIT_CODE = {{ read_file("#{__DIR__}/python_init_vi.py") }}
+    private PYTHON_INIT_MCMC_CODE = {{ read_file("#{__DIR__}/python_init_mcmc.py") }}
 
     private def self.json_to_f64(value : JSON::Any) : Float64
       raw = value.raw
@@ -210,6 +213,46 @@ module Tyclone
       end
 
       CompatInitBuffers.new(pi, theta, z)
+    end
+
+    private def self.run_python_init_mcmc(config : Config, effective_seed : UInt64, num_mutations : Int32, num_samples : Int32) : McmcCompatInitBuffers
+      input_json = "{\"seed\":#{effective_seed},\"num_mutations\":#{num_mutations},\"num_samples\":#{num_samples},\"init_method\":\"#{config.init_method}\",\"base_measure_alpha\":#{config.base_measure_alpha},\"base_measure_beta\":#{config.base_measure_beta},\"precision\":#{config.precision},\"alpha\":#{config.alpha}}"
+      proc = Process.new("python3", ["-c", PYTHON_INIT_MCMC_CODE],
+        input: :pipe,
+        output: :pipe,
+        error: STDERR
+      )
+      proc.input.print(input_json)
+      proc.input.close
+      json_str = proc.output.gets_to_end
+      proc.output.close
+      status = proc.wait
+      unless status.success?
+        raise KernelError.new("--python-compatible (mcmc): python3 exited with code #{status.exit_code}")
+      end
+      raise KernelError.new("--python-compatible (mcmc): python3 produced no output") if json_str.empty?
+
+      doc = JSON.parse(json_str).as_h
+      num_atoms_raw = doc["num_atoms"]?.try(&.as_i) || raise KernelError.new("--python-compatible (mcmc): missing num_atoms")
+      num_atoms = num_atoms_raw.to_i32
+      alpha_val = json_to_f64(doc["alpha"]? || raise KernelError.new("--python-compatible (mcmc): missing alpha"))
+      precision_val = json_to_f64(doc["precision"]? || raise KernelError.new("--python-compatible (mcmc): missing precision"))
+
+      cluster_id_raw = doc["cluster_id"]?.try(&.as_a) || raise KernelError.new("--python-compatible (mcmc): missing cluster_id")
+      atoms_phi_raw = doc["atoms_phi"]?.try(&.as_a) || raise KernelError.new("--python-compatible (mcmc): missing atoms_phi")
+
+      if cluster_id_raw.size != num_mutations
+        raise KernelError.new("--python-compatible (mcmc): cluster_id length mismatch")
+      end
+      expected_phi_len = num_atoms * num_samples
+      if atoms_phi_raw.size != expected_phi_len
+        raise KernelError.new("--python-compatible (mcmc): atoms_phi length mismatch")
+      end
+
+      cluster_id = cluster_id_raw.map { |v| v.as_i.to_i32 }
+      atoms_phi = atoms_phi_raw.map { |v| json_to_f64(v) }
+
+      McmcCompatInitBuffers.new(cluster_id, atoms_phi, num_atoms, alpha_val, precision_val)
     end
 
     def self.fit(config : Config, rows : Array(LibPcv::PcvRow), num_mutations : Int32, num_samples : Int32) : KernelResult
@@ -281,6 +324,11 @@ module Tyclone
     end
 
     def self.fit_mcmc(config : Config, rows : Array(LibPcv::PcvRow), num_mutations : Int32, num_samples : Int32) : KernelResult
+      effective_seed = config.seed
+      if config.python_compatible? && effective_seed.nil?
+        effective_seed = Random::Secure.rand(UInt64::MAX)
+      end
+
       cfg = LibPcv::PcvMcmcConfig.new(
         num_iters: config.num_iters,
         burnin: config.burnin,
@@ -297,23 +345,44 @@ module Tyclone
         mh_precision_proposal_precision: config.mh_precision_proposal_precision,
         precision: config.precision,
         density: (config.density == Density::Binomial ? 0_u8 : 1_u8),
-        use_seed: config.seed.nil? ? 0_u8 : 1_u8,
-        seed: config.seed || 0_u64,
+        use_seed: effective_seed.nil? ? 0_u8 : 1_u8,
+        seed: effective_seed || 0_u64,
         print_freq: config.print_freq
       )
 
       result_ptr = Pointer(LibPcv::PcvResult).null
       error_ptr = Pointer(LibPcv::PcvError).null
 
-      rc = LibPcv.pcv_fit_mcmc(
-        pointerof(cfg),
-        rows.to_unsafe,
-        rows.size,
-        num_mutations,
-        num_samples,
-        pointerof(result_ptr),
-        pointerof(error_ptr)
-      )
+      rc = if config.python_compatible?
+             seed_for_python = effective_seed || raise KernelError.new("--python-compatible (mcmc): seed resolution failed")
+             compat = run_python_init_mcmc(config, seed_for_python, num_mutations, num_samples)
+             LibPcv.pcv_fit_mcmc_with_init(
+               pointerof(cfg),
+               rows.to_unsafe,
+               rows.size,
+               num_mutations,
+               num_samples,
+               compat.cluster_id.to_unsafe,
+               compat.cluster_id.size,
+               compat.atoms_phi.to_unsafe,
+               compat.atoms_phi.size,
+               compat.num_atoms,
+               compat.alpha,
+               compat.precision,
+               pointerof(result_ptr),
+               pointerof(error_ptr)
+             )
+           else
+             LibPcv.pcv_fit_mcmc(
+               pointerof(cfg),
+               rows.to_unsafe,
+               rows.size,
+               num_mutations,
+               num_samples,
+               pointerof(result_ptr),
+               pointerof(error_ptr)
+             )
+           end
 
       if rc != 0
         message = "Unknown kernel error"

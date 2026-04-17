@@ -106,6 +106,7 @@ module Tyclone
           on("--mh-precision-step=F", "Precision MH step size (0=fixed)") { |v| opt.mh_precision_step = v.to_f64 }
           on("--mh-precision-proposal-precision=F", "Gamma proposal precision for beta-binomial precision") { |v| opt.mh_precision_proposal_precision = v.to_f64 }
           on("--print-freq=N", "Print progress every N iters (0=silent)") { |v| opt.print_freq = v.to_i32 }
+          on("--python-compatible", "Use Python/NumPy-compatible initialization (requires numpy)") { opt.python_compatible = true }
 
           _on_help_
         end
