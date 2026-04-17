@@ -1,8 +1,8 @@
 use crate::preprocess::build_sample_data_point;
 use crate::types::{DpState, PcvMcmcConfig, PcvRow, SampleDataPoint};
-use rand::Rng;
 
-use super::shared::{clip_unit_interval, sample_prior_atom, EPS};
+use super::rng::McmcRng;
+use super::shared::{clip_unit_interval, EPS};
 
 pub fn build_data_matrix(
     rows: &[PcvRow],
@@ -57,7 +57,7 @@ pub fn initialize_state(
     num_mutations: usize,
     num_samples: usize,
     _observed_phi: &[f64],
-    rng: &mut impl Rng,
+    rng: &mut dyn McmcRng,
 ) -> Result<DpState, String> {
     let disconnected = cfg.init_method == 0;
 
@@ -72,15 +72,12 @@ pub fn initialize_state(
     } else {
         1
     };
-    let mut atoms = Vec::with_capacity(initial_clusters);
-    for _ in 0..initial_clusters {
-        atoms.push(sample_prior_atom(
-            num_samples,
-            cfg.base_measure_alpha,
-            cfg.base_measure_beta,
-            rng,
-        )?);
-    }
+    let atoms = rng.sample_prior_atoms(
+        initial_clusters,
+        num_samples,
+        cfg.base_measure_alpha,
+        cfg.base_measure_beta,
+    )?;
 
     Ok(DpState {
         cluster_id,
@@ -97,9 +94,8 @@ pub fn initialize_state(
 #[cfg(test)]
 mod tests {
     use super::initialize_state;
+    use crate::mcmc::rng::LocalMcmcRng;
     use crate::types::PcvMcmcConfig;
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
 
     fn config(init_method: u8) -> PcvMcmcConfig {
         PcvMcmcConfig {
@@ -120,13 +116,14 @@ mod tests {
             density: 1,
             use_seed: 1,
             seed: 7,
+            python_rng_mode: 0,
             print_freq: 0,
         }
     }
 
     #[test]
     fn disconnected_initialization_allocates_each_mutation_to_its_own_cluster() {
-        let mut rng = StdRng::seed_from_u64(7);
+        let mut rng = LocalMcmcRng::from_seed(7);
         let state = initialize_state(&config(0), 5, 3, &vec![0.5; 15], &mut rng).unwrap();
         assert_eq!(state.atoms.len(), 5);
         assert_eq!(state.cluster_id, vec![0, 1, 2, 3, 4]);
@@ -134,7 +131,7 @@ mod tests {
 
     #[test]
     fn connected_initialization_allocates_all_mutations_to_one_cluster() {
-        let mut rng = StdRng::seed_from_u64(7);
+        let mut rng = LocalMcmcRng::from_seed(7);
         let state = initialize_state(&config(1), 5, 3, &vec![0.5; 15], &mut rng).unwrap();
         assert_eq!(state.atoms.len(), 1);
         assert_eq!(state.cluster_id, vec![0, 0, 0, 0, 0]);

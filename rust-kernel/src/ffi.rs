@@ -7,8 +7,8 @@ use crate::inference::fit_variational_model;
 use crate::mcmc::fit_mcmc_model;
 use crate::preprocess::{build_log_p_data, build_log_p_data_parallel, get_ccf_grid};
 use crate::types::{
-    ClusterAtom, DataPreprocessor, Density, DpState, PcvConfig, PcvError, PcvMcmcConfig,
-    PcvResult, PcvRow, Priors, VariationalParameters,
+    ClusterAtom, DataPreprocessor, Density, DpState, PcvConfig, PcvError, PcvMcmcConfig, PcvResult,
+    PcvRow, Priors, VariationalParameters,
 };
 use rand::rngs::StdRng;
 use rand::Rng;
@@ -1170,7 +1170,10 @@ fn decode_compat_mcmc_state(
         .iter()
         .map(|&v| {
             if v < 0 {
-                Err(format!("compat mcmc cluster_id contains negative value: {}", v))
+                Err(format!(
+                    "compat mcmc cluster_id contains negative value: {}",
+                    v
+                ))
             } else {
                 Ok(v as usize)
             }

@@ -105,6 +105,17 @@ MCMC-only:
 - `--alpha`: CRP concentration
 - `--init-method`: `connected` or `disconnected`
 
+Python helper selection:
+
+- `TYCLONE_PYTHON`: default Python executable for helper scripts
+
+Notes:
+
+- `fit-vi --python-compatible` still expects a Python 3 executable with NumPy support for `default_rng`
+- `fit-mcmc --python-compatible` is intended as a verification mode for comparing against Python PyClone-like behavior
+- `fit-mcmc --python-compatible` uses a Python helper and is compatible with Python 2.7+/3.x NumPy environments
+- On Apple Silicon with a Rosetta-backed Python 2 helper, `fit-mcmc --python-compatible` works but can be significantly slower than native execution
+
 ## Diagnostics
 
 Restart diagnostics for VI:

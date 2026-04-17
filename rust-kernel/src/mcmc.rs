@@ -1,12 +1,12 @@
 mod postprocess;
+mod rng;
 mod sampler;
 mod shared;
 mod state;
 
 use crate::types::{Density, DpState, McmcTrace, PcvMcmcConfig, PcvResult, PcvRow};
 use postprocess::build_result_from_trace;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rng::{LocalMcmcRng, McmcRng, PythonMcmcRng, PythonRngMode};
 use sampler::{atom_step, concentration_step, partition_step, precision_step, save_state};
 use state::{build_data_matrix, initialize_state};
 
@@ -35,14 +35,25 @@ pub fn fit_mcmc_model(
 
     let density = Density::try_from(cfg.density)?;
     let (data, observed_phi) = build_data_matrix(rows, num_mutations, num_samples)?;
-    let mut rng = if cfg.use_seed == 1 {
-        StdRng::seed_from_u64(cfg.seed)
+    let seed = if cfg.use_seed == 1 {
+        cfg.seed
     } else {
-        StdRng::seed_from_u64(rand::random::<u64>())
+        rand::random::<u64>()
+    };
+    let rng_mode = PythonRngMode::try_from(cfg.python_rng_mode)?;
+    let mut rng_backend: Box<dyn McmcRng> = match rng_mode {
+        PythonRngMode::Off => Box::new(LocalMcmcRng::from_seed(seed)),
+        PythonRngMode::Online => Box::new(PythonMcmcRng::new(seed)?),
     };
     let mut state = match initial_state {
         Some(s) => s,
-        None => initialize_state(cfg, num_mutations, num_samples, &observed_phi, &mut rng)?,
+        None => initialize_state(
+            cfg,
+            num_mutations,
+            num_samples,
+            &observed_phi,
+            &mut *rng_backend,
+        )?,
     };
 
     let mut trace = McmcTrace {
@@ -67,7 +78,7 @@ pub fn fit_mcmc_model(
             sampler_max_clusters,
             cfg.base_measure_alpha,
             cfg.base_measure_beta,
-            &mut rng,
+            &mut *rng_backend,
         )?;
         atom_step(
             &mut state,
@@ -76,8 +87,8 @@ pub fn fit_mcmc_model(
             density,
             cfg.base_measure_alpha,
             cfg.base_measure_beta,
-            &mut rng,
-        );
+            &mut *rng_backend,
+        )?;
         precision_step(
             &mut state,
             &data,
@@ -85,9 +96,9 @@ pub fn fit_mcmc_model(
             density,
             cfg.mh_precision_step,
             cfg.mh_precision_proposal_precision,
-            &mut rng,
-        );
-        concentration_step(&mut state, num_mutations, cfg, &mut rng)?;
+            &mut *rng_backend,
+        )?;
+        concentration_step(&mut state, num_mutations, cfg, &mut *rng_backend)?;
 
         if cfg.print_freq > 0 && (iteration + 1) % cfg.print_freq as usize == 0 {
             eprintln!(
@@ -142,6 +153,7 @@ mod tests {
             density: 0,
             use_seed: 1,
             seed: 7,
+            python_rng_mode: 0,
             print_freq: 0,
         }
     }
@@ -195,7 +207,7 @@ mod tests {
             },
         ];
 
-        let result = fit_mcmc_model(&default_mcmc_config(), &rows, 2, 2).unwrap();
+        let result = fit_mcmc_model(&default_mcmc_config(), &rows, 2, 2, None).unwrap();
         assert_eq!(result.num_mutations, 2);
         assert_eq!(result.num_samples, 2);
         assert!((1..=2).contains(&result.num_clusters));
@@ -243,7 +255,7 @@ mod tests {
         cfg.burnin = 10;
         cfg.thin = 2;
 
-        let result = fit_mcmc_model(&cfg, &rows, 2, 1).unwrap();
+        let result = fit_mcmc_model(&cfg, &rows, 2, 1, None).unwrap();
         assert_eq!(result.num_saved_trace_samples, 5);
     }
 

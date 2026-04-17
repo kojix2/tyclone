@@ -1,11 +1,9 @@
 use crate::types::{ClusterAtom, Density, DpState, McmcTrace, PcvMcmcConfig, SampleDataPoint};
-use rand::seq::SliceRandom;
-use rand::{Rng, RngExt};
-use rand_distr::{Beta, Distribution, Gamma};
 
+use super::rng::McmcRng;
 use super::shared::{
     base_measure_log_p_atom, cluster_atom_log_posterior, cluster_members, mutation_log_likelihood,
-    sample_log_weights, sample_prior_atom, total_log_likelihood, AUX_NEW_CLUSTERS, EPS,
+    sample_log_weights, total_log_likelihood, AUX_NEW_CLUSTERS, EPS,
 };
 
 const DEFAULT_PRECISION_PRIOR_SHAPE: f64 = 1.0;
@@ -32,7 +30,7 @@ pub fn partition_step(
     max_clusters: usize,
     base_measure_alpha: f64,
     base_measure_beta: f64,
-    rng: &mut impl Rng,
+    rng: &mut dyn McmcRng,
 ) -> Result<(), String> {
     let mut counts = vec![0usize; state.atoms.len()];
     for &cluster_index in &state.cluster_id {
@@ -40,7 +38,7 @@ pub fn partition_step(
     }
 
     let mut mutation_order = (0..num_mutations).collect::<Vec<_>>();
-    mutation_order.shuffle(rng);
+    rng.shuffle_indices(&mut mutation_order)?;
 
     for mutation_index in mutation_order {
         let old_cluster = state.cluster_id[mutation_index];
@@ -106,9 +104,19 @@ pub fn partition_step(
                 AUX_NEW_CLUSTERS
             };
 
+            let mut auxiliary_atoms = rng
+                .sample_prior_atoms(
+                    num_auxiliary,
+                    num_samples,
+                    base_measure_alpha,
+                    base_measure_beta,
+                )?
+                .into_iter();
+
             for _ in 0..num_auxiliary {
-                let atom =
-                    sample_prior_atom(num_samples, base_measure_alpha, base_measure_beta, rng)?;
+                let atom = auxiliary_atoms
+                    .next()
+                    .ok_or_else(|| "failed to consume batched auxiliary atoms".to_string())?;
                 log_weights.push(
                     (state.alpha / AUX_NEW_CLUSTERS as f64).ln()
                         + mutation_log_likelihood(
@@ -149,8 +157,8 @@ pub fn atom_step(
     density: Density,
     base_measure_alpha: f64,
     base_measure_beta: f64,
-    rng: &mut impl Rng,
-) {
+    rng: &mut dyn McmcRng,
+) -> Result<(), String> {
     let members = cluster_members(state);
     for (cluster_index, member_indices) in members.iter().enumerate() {
         if member_indices.is_empty() {
@@ -158,11 +166,8 @@ pub fn atom_step(
         }
 
         for sample_index in 0..num_samples {
-            let Ok(proposal_scalar) =
-                sample_prior_atom(1, base_measure_alpha, base_measure_beta, rng)
-            else {
-                continue;
-            };
+            let proposal_scalar =
+                rng.sample_prior_atom(1, base_measure_alpha, base_measure_beta)?;
 
             let current_atom = state.atoms[cluster_index].clone();
             let mut proposal_atom = current_atom.clone();
@@ -194,11 +199,13 @@ pub fn atom_step(
             let reverse_log_ratio = current_lp
                 - base_measure_log_p_atom(&current_atom, base_measure_alpha, base_measure_beta);
 
-            if rng.random::<f64>().ln() < (forward_log_ratio - reverse_log_ratio).min(0.0) {
+            if rng.uniform_f64()?.ln() < (forward_log_ratio - reverse_log_ratio).min(0.0) {
                 state.atoms[cluster_index] = proposal_atom;
             }
         }
     }
+
+    Ok(())
 }
 
 pub fn precision_step(
@@ -208,19 +215,15 @@ pub fn precision_step(
     density: Density,
     mh_precision_step: f64,
     proposal_precision: f64,
-    rng: &mut impl Rng,
-) {
+    rng: &mut dyn McmcRng,
+) -> Result<(), String> {
     if density != Density::BetaBinomial || mh_precision_step <= 0.0 || proposal_precision <= 0.0 {
-        return;
+        return Ok(());
     }
 
     let old_precision = state.precision.max(EPS);
     let (proposal_shape, proposal_rate) = gamma_proposal_params(old_precision, proposal_precision);
-    let proposal_dist = match Gamma::new(proposal_shape, 1.0 / proposal_rate) {
-        Ok(dist) => dist,
-        Err(_) => return,
-    };
-    let new_precision = proposal_dist.sample(rng).max(EPS);
+    let new_precision = rng.gamma_sample(proposal_shape, proposal_rate)?;
 
     let current_ll = total_log_likelihood(state, data, num_samples, density)
         + log_gamma_pdf(
@@ -243,39 +246,40 @@ pub fn precision_step(
         proposal_ll - log_gamma_pdf(new_precision, proposal_shape, proposal_rate);
     let reverse_log_ratio = current_ll - log_gamma_pdf(old_precision, reverse_shape, reverse_rate);
 
-    if rng.random::<f64>().ln() >= (forward_log_ratio - reverse_log_ratio).min(0.0) {
+    if rng.uniform_f64()?.ln() >= (forward_log_ratio - reverse_log_ratio).min(0.0) {
         state.precision = old_value;
     }
+
+    Ok(())
 }
 
 pub fn concentration_step(
     state: &mut DpState,
     num_mutations: usize,
     cfg: &PcvMcmcConfig,
-    rng: &mut impl Rng,
+    rng: &mut dyn McmcRng,
 ) -> Result<(), String> {
     if cfg.alpha_prior_shape <= 0.0 || cfg.alpha_prior_rate <= 0.0 {
         return Err("alpha prior shape and rate must be > 0".to_string());
     }
 
     let clusters = state.atoms.len() as f64;
-    let beta = Beta::new(state.alpha + 1.0, num_mutations as f64)
-        .map_err(|error| format!("failed to initialize beta sampler: {error}"))?;
-    let eta = beta.sample(rng).clamp(EPS, 1.0 - EPS);
+    let eta = rng
+        .sample_prior_atom(1, state.alpha + 1.0, num_mutations as f64)?
+        .phi[0]
+        .clamp(EPS, 1.0 - EPS);
     let mix = (cfg.alpha_prior_shape + clusters - 1.0)
         / ((num_mutations as f64) * (cfg.alpha_prior_rate - eta.ln())
             + cfg.alpha_prior_shape
             + clusters
             - 1.0);
-    let shape = if rng.random::<f64>() < mix {
+    let shape = if rng.uniform_f64()? < mix {
         cfg.alpha_prior_shape + clusters
     } else {
         cfg.alpha_prior_shape + clusters - 1.0
     };
     let rate = cfg.alpha_prior_rate - eta.ln();
-    let gamma = Gamma::new(shape, 1.0 / rate)
-        .map_err(|error| format!("failed to initialize gamma sampler: {error}"))?;
-    state.alpha = gamma.sample(rng).max(EPS);
+    state.alpha = rng.gamma_sample(shape, rate)?;
     Ok(())
 }
 

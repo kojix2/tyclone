@@ -161,6 +161,8 @@ pub struct PcvMcmcConfig {
     pub use_seed: u8,
     /// RNG seed value (ignored when use_seed == 0).
     pub seed: u64,
+    /// Python RNG mode: 0 = off, 1 = Python helper-backed compatibility mode.
+    pub python_rng_mode: u8,
     /// Print progress every N iterations (0 = silent).
     pub print_freq: i32,
 }

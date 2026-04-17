@@ -8,6 +8,8 @@ import json,sys,numpy as np
 
 # stdin JSON: {seed, num_restarts, num_clusters, num_mutations, num_samples, num_grid_points}
 c=json.load(sys.stdin)
+if not hasattr(np.random, "default_rng"):
+    raise RuntimeError("python-compatible VI initialization requires NumPy default_rng; set TYCLONE_PYTHON to a Python 3 executable")
 rng=np.random.default_rng(c["seed"])
 K,R,N,D,G=c["num_clusters"],c["num_restarts"],c["num_mutations"],c["num_samples"],c["num_grid_points"]
 ones=np.ones(K)

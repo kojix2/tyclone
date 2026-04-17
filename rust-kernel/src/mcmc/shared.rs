@@ -1,9 +1,8 @@
 use crate::likelihood::{log_pyclone_beta_binomial_pdf, log_pyclone_binomial_pdf};
-use crate::math::log_sum_exp;
 use crate::types::{ClusterAtom, Density, DpState, SampleDataPoint};
-use rand::{Rng, RngExt};
-use rand_distr::{Beta, Distribution};
 use statrs::function::gamma::ln_gamma;
+
+use super::rng::McmcRng;
 
 pub const EPS: f64 = 1e-6;
 pub const AUX_NEW_CLUSTERS: usize = 2;
@@ -12,24 +11,8 @@ pub fn clip_unit_interval(value: f64) -> f64 {
     value.clamp(EPS, 1.0 - EPS)
 }
 
-pub fn sample_log_weights(log_weights: &[f64], rng: &mut impl Rng) -> Result<usize, String> {
-    if log_weights.is_empty() {
-        return Err("log_weights must not be empty".to_string());
-    }
-    let norm = log_sum_exp(log_weights);
-    if !norm.is_finite() {
-        return Err("all candidate log-weights are non-finite".to_string());
-    }
-
-    let mut threshold = rng.random::<f64>();
-    for (index, &log_weight) in log_weights.iter().enumerate() {
-        threshold -= (log_weight - norm).exp();
-        if threshold <= 0.0 {
-            return Ok(index);
-        }
-    }
-
-    Ok(log_weights.len() - 1)
+pub fn sample_log_weights(log_weights: &[f64], rng: &mut dyn McmcRng) -> Result<usize, String> {
+    rng.categorical_from_log_weights(log_weights)
 }
 
 pub fn log_beta_density(value: f64, alpha: f64, beta: f64) -> f64 {
@@ -43,20 +26,6 @@ pub fn base_measure_log_p_atom(atom: &ClusterAtom, alpha: f64, beta: f64) -> f64
         .iter()
         .map(|&value| log_beta_density(value, alpha, beta))
         .sum()
-}
-
-pub fn sample_prior_atom(
-    num_samples: usize,
-    alpha: f64,
-    beta: f64,
-    rng: &mut impl Rng,
-) -> Result<ClusterAtom, String> {
-    let beta_dist = Beta::new(alpha, beta)
-        .map_err(|error| format!("failed to initialize beta base measure: {error}"))?;
-    let phi = (0..num_samples)
-        .map(|_| clip_unit_interval(beta_dist.sample(rng)))
-        .collect();
-    Ok(ClusterAtom { phi })
 }
 
 pub fn mutation_log_likelihood(
