@@ -24,8 +24,8 @@ Written in Crystal CLI with a Rust kernel.
 ## Mode maturity
 
 - PyClone-VI mode is near-parity with the original PyClone-VI implementation.
-- PhyClone mode is under active parity development against upstream PhyClone.
-- Strict PhyClone posterior, sampler, and output parity are still in progress.
+- `phy` commands are experimental.
+- `phy` commands are not intended to reproduce upstream PhyClone results exactly.
 
 ## Build
 
@@ -202,13 +202,14 @@ This hook is intended for implementation comparison and fairness checks, not nor
 - output rows are inference-derived and cluster IDs are compactly renumbered
 - tests cover Rust units, Crystal specs, and a deterministic golden output check
 
-## PhyClone parity notes
+## PhyClone Notes
 
-- The `phy` implementation is being aligned with upstream-compatible internals under `rust-kernel/src/phyclone/compat`, and `phy run` executes the compat Particle Gibbs / SMC sampler there.
+- The `phy` implementation is separate from upstream PhyClone.
+- Exact matching of PhyClone posterior probabilities, sampler behavior, traces, and output files is not planned.
 - In `phy run`, `num_iters` is total iterations and recorded trace length follows post-`--burnin` / `--thin`.
 - consensus output includes clade support and a `consensus_tree` reconstruction, while representative topology fields remain for compatibility.
 - loss prior supports `cellular_prevalence`-informed assignment via `--cluster-file` metadata.
-- trace and post-process outputs are currently JSONL/JSON; HDF5/archive parity is planned but not complete.
+- trace and post-process outputs use unclone's JSONL/JSON formats.
 
 ## Attribution And License
 
