@@ -157,7 +157,10 @@ pub fn compute_likelihood_grid_into(
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_likelihood_grid, log_beta_binomial_pdf, log_binomial_pdf};
+    use super::{
+        compute_likelihood_grid, log_beta_binomial_pdf, log_binomial_pdf,
+        log_pyclone_beta_binomial_pdf, log_pyclone_binomial_pdf,
+    };
     use crate::abi::PcvRow;
     use crate::preprocess::{build_sample_data_point, get_ccf_grid};
     use crate::types::Density;
@@ -195,6 +198,29 @@ mod tests {
         assert!(log_binomial_pdf(10, 1, 0.0).is_infinite());
         assert_eq!(log_binomial_pdf(10, 10, 1.0), 0.0);
         assert!(log_binomial_pdf(10, 9, 1.0).is_infinite());
+    }
+
+    #[test]
+    fn pyclone_likelihoods_stay_finite_on_inference_grid_boundaries() {
+        let row = PcvRow {
+            mutation_index: 0,
+            sample_index: 0,
+            ref_counts: 10,
+            alt_counts: 5,
+            major_cn: 2,
+            minor_cn: 1,
+            normal_cn: 2,
+            tumour_content: 1.0,
+            error_rate: 1e-3,
+        };
+
+        let data = build_sample_data_point(&row).unwrap();
+        let grid = get_ccf_grid(5, 1e-6).unwrap();
+
+        for ccf in [grid[0], grid[grid.len() - 1]] {
+            assert!(log_pyclone_binomial_pdf(&data, ccf).is_finite());
+            assert!(log_pyclone_beta_binomial_pdf(&data, ccf, 200.0).is_finite());
+        }
     }
 
     #[test]

@@ -62,6 +62,16 @@ int pcv_fit_with_init(
   PcvError** out_error
 );
 
+int pcv_phyclone_generate_trace(
+  const char* cluster_json,
+  int32_t num_chains,
+  int32_t num_iters,
+  uint8_t use_seed,
+  uint64_t seed,
+  char** out_json,
+  PcvError** out_error
+);
+
 size_t pcv_result_num_mutations(const PcvResult* result);
 size_t pcv_result_num_samples(const PcvResult* result);
 size_t pcv_result_num_clusters(const PcvResult* result);
@@ -79,6 +89,7 @@ const double* pcv_result_cluster_sample_prevalence_std(const PcvResult* result);
 void pcv_result_free(PcvResult* result);
 
 const char* pcv_error_message(const PcvError* err);
+void pcv_string_free(char* value);
 void pcv_error_free(PcvError* err);
 
 #endif

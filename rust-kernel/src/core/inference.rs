@@ -265,6 +265,8 @@ fn sum_log_p_data_theta_with_z(
                 }
                 row_total
             })
+            .collect::<Vec<_>>()
+            .into_iter()
             .sum()
     } else {
         let mut total_sum = 0.0;
@@ -635,6 +637,8 @@ impl VariationalParameters {
                     }
                     row_data_term
                 })
+                .collect::<Vec<_>>()
+                .into_iter()
                 .sum()
         } else {
             let prior_log_theta = ArrayView1::from(&priors.log_theta);

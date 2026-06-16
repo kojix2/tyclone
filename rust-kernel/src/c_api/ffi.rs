@@ -3,6 +3,7 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use std::ffi::{c_char, c_int, CStr, CString};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
 use rand::{RngExt, SeedableRng};
@@ -453,6 +454,23 @@ fn assign_error(out_error: *mut *mut PcvError, message: &str) {
     }
 }
 
+fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        format!("rust panic across FFI boundary: {message}")
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        format!("rust panic across FFI boundary: {message}")
+    } else {
+        "rust panic across FFI boundary".to_string()
+    }
+}
+
+fn catch_ffi_value<T, F>(default: T, body: F) -> T
+where
+    F: FnOnce() -> T,
+{
+    catch_unwind(AssertUnwindSafe(body)).unwrap_or(default)
+}
+
 fn run_ffi_entrypoint<F>(
     out_result: *mut *mut PcvResult,
     out_error: *mut *mut PcvError,
@@ -461,6 +479,30 @@ fn run_ffi_entrypoint<F>(
 where
     F: FnOnce() -> Result<PcvResult, String>,
 {
+    match catch_unwind(AssertUnwindSafe(|| {
+        run_ffi_entrypoint_inner(out_result, out_error, body)
+    })) {
+        Ok(rc) => rc,
+        Err(payload) => {
+            assign_error(out_error, &panic_message(payload));
+            1
+        }
+    }
+}
+
+fn run_ffi_entrypoint_inner<F>(
+    out_result: *mut *mut PcvResult,
+    out_error: *mut *mut PcvError,
+    body: F,
+) -> c_int
+where
+    F: FnOnce() -> Result<PcvResult, String>,
+{
+    if !out_result.is_null() {
+        unsafe {
+            *out_result = ptr::null_mut();
+        }
+    }
     if !out_error.is_null() {
         unsafe {
             *out_error = ptr::null_mut();
@@ -493,6 +535,30 @@ fn run_string_entrypoint<F>(
 where
     F: FnOnce() -> Result<String, String>,
 {
+    match catch_unwind(AssertUnwindSafe(|| {
+        run_string_entrypoint_inner(out_json, out_error, body)
+    })) {
+        Ok(rc) => rc,
+        Err(payload) => {
+            assign_error(out_error, &panic_message(payload));
+            1
+        }
+    }
+}
+
+fn run_string_entrypoint_inner<F>(
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut PcvError,
+    body: F,
+) -> c_int
+where
+    F: FnOnce() -> Result<String, String>,
+{
+    if !out_json.is_null() {
+        unsafe {
+            *out_json = ptr::null_mut();
+        }
+    }
     if !out_error.is_null() {
         unsafe {
             *out_error = ptr::null_mut();
@@ -533,21 +599,21 @@ pub extern "C" fn pcv_fit(
     out_result: *mut *mut PcvResult,
     out_error: *mut *mut PcvError,
 ) -> c_int {
-    pcv_fit_with_init(
-        config,
-        rows,
-        rows_len,
-        num_mutations,
-        num_samples,
-        ptr::null(),
-        0,
-        ptr::null(),
-        0,
-        ptr::null(),
-        0,
-        out_result,
-        out_error,
-    )
+    run_ffi_entrypoint(out_result, out_error, || {
+        let request =
+            unsafe { BorrowedCall::borrow(config, rows, rows_len, num_mutations, num_samples)? };
+        run_vi_request(
+            request,
+            VariationalCompatInit {
+                compat_pi: ptr::null(),
+                compat_pi_len: 0,
+                compat_theta: ptr::null(),
+                compat_theta_len: 0,
+                compat_z: ptr::null(),
+                compat_z_len: 0,
+            },
+        )
+    })
 }
 
 #[no_mangle]
@@ -811,138 +877,170 @@ fn build_trace_cluster_summaries_from_data_points(
 
 #[no_mangle]
 pub extern "C" fn pcv_result_num_mutations(result: *const PcvResult) -> usize {
-    if result.is_null() {
-        return 0;
-    }
-    unsafe { (*result).num_mutations }
+    catch_ffi_value(0, || {
+        if result.is_null() {
+            return 0;
+        }
+        unsafe { (*result).num_mutations }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_num_samples(result: *const PcvResult) -> usize {
-    if result.is_null() {
-        return 0;
-    }
-    unsafe { (*result).num_samples }
+    catch_ffi_value(0, || {
+        if result.is_null() {
+            return 0;
+        }
+        unsafe { (*result).num_samples }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_num_clusters(result: *const PcvResult) -> usize {
-    if result.is_null() {
-        return 0;
-    }
-    unsafe { (*result).num_clusters }
+    catch_ffi_value(0, || {
+        if result.is_null() {
+            return 0;
+        }
+        unsafe { (*result).num_clusters }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_num_saved_trace_samples(result: *const PcvResult) -> usize {
-    if result.is_null() {
-        return 0;
-    }
-    unsafe { (*result).num_saved_trace_samples }
+    catch_ffi_value(0, || {
+        if result.is_null() {
+            return 0;
+        }
+        unsafe { (*result).num_saved_trace_samples }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_mutation_cluster_ids(result: *const PcvResult) -> *const i32 {
-    if result.is_null() {
-        return ptr::null();
-    }
-    unsafe { (*result).mutation_cluster_ids.as_ptr() }
+    catch_ffi_value(ptr::null(), || {
+        if result.is_null() {
+            return ptr::null();
+        }
+        unsafe { (*result).mutation_cluster_ids.as_ptr() }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_mutation_cluster_probs(result: *const PcvResult) -> *const f64 {
-    if result.is_null() {
-        return ptr::null();
-    }
-    unsafe { (*result).mutation_cluster_probs.as_ptr() }
+    catch_ffi_value(ptr::null(), || {
+        if result.is_null() {
+            return ptr::null();
+        }
+        unsafe { (*result).mutation_cluster_probs.as_ptr() }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_mutation_sample_prevalence(result: *const PcvResult) -> *const f64 {
-    if result.is_null() {
-        return ptr::null();
-    }
-    unsafe { (*result).mutation_sample_prevalence.as_ptr() }
+    catch_ffi_value(ptr::null(), || {
+        if result.is_null() {
+            return ptr::null();
+        }
+        unsafe { (*result).mutation_sample_prevalence.as_ptr() }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_mutation_sample_prevalence_std(
     result: *const PcvResult,
 ) -> *const f64 {
-    if result.is_null() {
-        return ptr::null();
-    }
-    unsafe { (*result).mutation_sample_prevalence_std.as_ptr() }
+    catch_ffi_value(ptr::null(), || {
+        if result.is_null() {
+            return ptr::null();
+        }
+        unsafe { (*result).mutation_sample_prevalence_std.as_ptr() }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_saved_mutation_sample_prevalence(
     result: *const PcvResult,
 ) -> *const f64 {
-    if result.is_null() {
-        return ptr::null();
-    }
-    unsafe { (*result).saved_mutation_sample_prevalence.as_ptr() }
+    catch_ffi_value(ptr::null(), || {
+        if result.is_null() {
+            return ptr::null();
+        }
+        unsafe { (*result).saved_mutation_sample_prevalence.as_ptr() }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_saved_precision_trace(result: *const PcvResult) -> *const f64 {
-    if result.is_null() {
-        return ptr::null();
-    }
-    unsafe { (*result).saved_precision_trace.as_ptr() }
+    catch_ffi_value(ptr::null(), || {
+        if result.is_null() {
+            return ptr::null();
+        }
+        unsafe { (*result).saved_precision_trace.as_ptr() }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_cluster_sample_prevalence(result: *const PcvResult) -> *const f64 {
-    if result.is_null() {
-        return ptr::null();
-    }
-    unsafe { (*result).cluster_sample_prevalence.as_ptr() }
+    catch_ffi_value(ptr::null(), || {
+        if result.is_null() {
+            return ptr::null();
+        }
+        unsafe { (*result).cluster_sample_prevalence.as_ptr() }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_cluster_sample_prevalence_std(result: *const PcvResult) -> *const f64 {
-    if result.is_null() {
-        return ptr::null();
-    }
-    unsafe { (*result).cluster_sample_prevalence_std.as_ptr() }
+    catch_ffi_value(ptr::null(), || {
+        if result.is_null() {
+            return ptr::null();
+        }
+        unsafe { (*result).cluster_sample_prevalence_std.as_ptr() }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_result_free(result: *mut PcvResult) {
-    if result.is_null() {
-        return;
-    }
-    unsafe {
-        drop(Box::from_raw(result));
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if result.is_null() {
+            return;
+        }
+        unsafe {
+            drop(Box::from_raw(result));
+        }
+    }));
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_error_message(err: *const PcvError) -> *const c_char {
-    if err.is_null() {
-        return ptr::null();
-    }
-    unsafe { (*err).message.as_ptr() }
+    catch_ffi_value(ptr::null(), || {
+        if err.is_null() {
+            return ptr::null();
+        }
+        unsafe { (*err).message.as_ptr() }
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_string_free(value: *mut c_char) {
-    if value.is_null() {
-        return;
-    }
-    unsafe {
-        drop(CString::from_raw(value));
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if value.is_null() {
+            return;
+        }
+        unsafe {
+            drop(CString::from_raw(value));
+        }
+    }));
 }
 
 #[no_mangle]
 pub extern "C" fn pcv_error_free(err: *mut PcvError) {
-    if err.is_null() {
-        return;
-    }
-    unsafe {
-        drop(Box::from_raw(err));
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if err.is_null() {
+            return;
+        }
+        unsafe {
+            drop(Box::from_raw(err));
+        }
+    }));
 }
