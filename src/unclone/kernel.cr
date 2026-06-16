@@ -1,4 +1,4 @@
-module Tyclone
+module UnClone
   module Kernel
     def self.handle_result(result_ptr : KernelAbi::Result*, error_ptr : KernelAbi::Error*, rc : Int32) : PcvTabularResult
       if rc != 0

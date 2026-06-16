@@ -1,12 +1,12 @@
 require "./spec_helper"
 
-describe Tyclone::ViConfig do
+describe UnClone::ViConfig do
   it "has expected default values" do
-    config = Tyclone::ViConfig.new
+    config = UnClone::ViConfig.new
     config.in_file.should eq("")
     config.out_file.should eq("")
     config.num_clusters.should eq(10)
-    config.density.should eq(Tyclone::Density::Binomial)
+    config.density.should eq(UnClone::Density::Binomial)
     config.num_grid_points.should eq(100)
     config.num_restarts.should eq(1)
     config.convergence_threshold.should be_close(1e-6, 1e-15)

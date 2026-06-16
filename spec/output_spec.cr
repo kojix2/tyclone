@@ -2,17 +2,17 @@ require "./spec_helper"
 require "compress/gzip"
 
 private def make_output_row
-  Tyclone::OutputRow.new("mut1", "s1", 0, 0.5, 0.1, 0.9)
+  UnClone::OutputRow.new("mut1", "s1", 0, 0.5, 0.1, 0.9)
 end
 
-describe Tyclone::Output do
+describe UnClone::Output do
   describe ".write" do
     it "produces correct TSV header" do
-      tmp = File.tempfile("tyclone_output_spec")
+      tmp = File.tempfile("unclone_output_spec")
       path = tmp.path
       tmp.close
       begin
-        Tyclone::Output.write(path, [] of Tyclone::OutputRow, false)
+        UnClone::Output.write(path, [] of UnClone::OutputRow, false)
         content = File.read(path)
         content.should eq(
           "mutation_id\tsample_id\tcluster_id\tcellular_prevalence\tcellular_prevalence_std\tcluster_assignment_prob\n"
@@ -23,11 +23,11 @@ describe Tyclone::Output do
     end
 
     it "writes data rows with correct field values" do
-      tmp = File.tempfile("tyclone_output_spec")
+      tmp = File.tempfile("unclone_output_spec")
       path = tmp.path
       tmp.close
       begin
-        Tyclone::Output.write(path, [make_output_row], false)
+        UnClone::Output.write(path, [make_output_row], false)
         lines = File.read(path).lines
         lines.size.should eq(2)
         fields = lines[1].split('\t')
@@ -43,11 +43,11 @@ describe Tyclone::Output do
     end
 
     it "empty rows produce header only" do
-      tmp = File.tempfile("tyclone_output_spec")
+      tmp = File.tempfile("unclone_output_spec")
       path = tmp.path
       tmp.close
       begin
-        Tyclone::Output.write(path, [] of Tyclone::OutputRow, false)
+        UnClone::Output.write(path, [] of UnClone::OutputRow, false)
         lines = File.read(path).lines
         lines.size.should eq(1)
       ensure
@@ -56,11 +56,11 @@ describe Tyclone::Output do
     end
 
     it "gzip output is readable and contains expected content" do
-      tmp = File.tempfile("tyclone_output_spec")
+      tmp = File.tempfile("unclone_output_spec")
       path = tmp.path
       tmp.close
       begin
-        Tyclone::Output.write(path, [make_output_row], true)
+        UnClone::Output.write(path, [make_output_row], true)
         content = File.open(path) do |file|
           Compress::Gzip::Reader.open(file, &.gets_to_end)
         end

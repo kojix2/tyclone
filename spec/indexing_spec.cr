@@ -1,10 +1,10 @@
 require "./spec_helper"
 
 private def make_row(mutation_id, sample_id, ref_counts, alt_counts, tumour_content = 0.7, error_rate = 0.001)
-  Tyclone::InputRow.new(mutation_id, sample_id, ref_counts, alt_counts, 2, 1, 2, tumour_content, error_rate)
+  UnClone::InputRow.new(mutation_id, sample_id, ref_counts, alt_counts, 2, 1, 2, tumour_content, error_rate)
 end
 
-describe Tyclone::Indexing do
+describe UnClone::Indexing do
   describe ".build" do
     rows = [
       make_row("chrZ_99", "sample_b", 10, 5, 0.7),
@@ -13,7 +13,7 @@ describe Tyclone::Indexing do
       make_row("chrA_01", "sample_b", 12, 4, 0.8),
     ]
 
-    indexed = Tyclone::Indexing.build(rows)
+    indexed = UnClone::Indexing.build(rows)
 
     it "sorts mutation_ids alphabetically" do
       indexed.mutation_ids.should eq(["chrA_01", "chrZ_99"])
@@ -59,7 +59,7 @@ describe Tyclone::Indexing do
     end
 
     it "converts indexed rows into ABI rows only at the kernel boundary" do
-      abi_rows = Tyclone::KernelAbi.build_rows(indexed.rows)
+      abi_rows = UnClone::KernelAbi.build_rows(indexed.rows)
       abi_rows.size.should eq(4)
 
       matches = abi_rows.select { |row| row.mutation_index == 1 && row.sample_index == 1 }

@@ -1,4 +1,4 @@
-module Tyclone
+module UnClone
   class CliError < Exception
   end
 

@@ -1,6 +1,6 @@
 require "time"
 
-module Tyclone
+module UnClone
   struct CliProfile
     property input_read_ms : Float64 = 0.0
     property sanitize_ms : Float64 = 0.0
@@ -13,7 +13,7 @@ module Tyclone
 
     def print_summary
       STDERR.puts(
-        "[tyclone-cli-profile] input_read_ms=#{@input_read_ms} sanitize_ms=#{@sanitize_ms} indexing_ms=#{@indexing_ms} kernel_ms=#{@kernel_ms} result_build_ms=#{@result_build_ms} output_write_ms=#{@output_write_ms} trace_dump_ms=#{@trace_dump_ms} total_ms=#{@total_ms}"
+        "[unclone-cli-profile] input_read_ms=#{@input_read_ms} sanitize_ms=#{@sanitize_ms} indexing_ms=#{@indexing_ms} kernel_ms=#{@kernel_ms} result_build_ms=#{@result_build_ms} output_write_ms=#{@output_write_ms} trace_dump_ms=#{@trace_dump_ms} total_ms=#{@total_ms}"
       )
     end
   end

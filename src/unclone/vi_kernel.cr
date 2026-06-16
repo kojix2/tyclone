@@ -1,13 +1,13 @@
 require "json"
 
-module Tyclone
+module UnClone
   module ViKernel
     private record CompatInitBuffers, pi : Array(Float64), theta : Array(Float64), z : Array(Float64)
 
     private PYTHON_INIT_CODE = {{ read_file("#{__DIR__}/python_init_vi.py") }}
 
     private def self.resolve_python_executable : String
-      ENV["TYCLONE_PYTHON"]? || "python3"
+      ENV["UNCLONE_PYTHON"]? || "python3"
     end
 
     private def self.json_to_f64(value : JSON::Any) : Float64

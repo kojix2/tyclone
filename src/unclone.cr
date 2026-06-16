@@ -1,24 +1,25 @@
 require "set"
-require "./tyclone/config"
-require "./tyclone/errors"
-require "./tyclone/input"
-require "./tyclone/sanitize"
-require "./tyclone/indexing"
-require "./tyclone/ffi"
-require "./tyclone/kernel_result"
-require "./tyclone/kernel"
-require "./tyclone/phyclone_kernel"
-require "./tyclone/phyclone"
-require "./tyclone/vi_kernel"
-require "./tyclone/result"
-require "./tyclone/output"
-require "./tyclone/cli"
-require "./tyclone/run"
+require "./unclone/config"
+require "./unclone/errors"
+require "./unclone/input"
+require "./unclone/sanitize"
+require "./unclone/indexing"
+require "./unclone/ffi"
+require "./unclone/kernel_result"
+require "./unclone/kernel"
+require "./unclone/phyclone_kernel"
+require "./unclone/phyclone"
+require "./unclone/vi_kernel"
+require "./unclone/result"
+require "./unclone/output"
+require "./unclone/cli"
+require "./unclone/run"
 
-module Tyclone
-  VERSION = {{ `shards version #{__DIR__}`.chomp.stringify }}
-  PROGRAM = "tyclone"
-  SOURCE  = "https://github.com/kojix2/tyclone"
+module UnClone
+  VERSION      = {{ `shards version #{__DIR__}`.chomp.stringify }}
+  DISPLAY_NAME = "UnClone"
+  PROGRAM      = "unclone"
+  SOURCE       = "https://github.com/kojix2/unclone"
 
   def self.main(args = ARGV)
     parser = CLI::Parser.new

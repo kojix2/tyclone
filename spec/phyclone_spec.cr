@@ -26,9 +26,9 @@ def write_phy_input_three_clusters(path : String)
     TSV
 end
 
-describe Tyclone::PhyCloneRunConfig do
+describe UnClone::PhyCloneRunConfig do
   it "has expected default values" do
-    config = Tyclone::PhyCloneRunConfig.new
+    config = UnClone::PhyCloneRunConfig.new
     config.in_file.should eq("")
     config.out_file.should eq("")
     config.num_iters.should eq(10_000)
@@ -42,7 +42,7 @@ describe Tyclone::PhyCloneRunConfig do
     config.concentration_update?.should be_true
     config.concentration_value.should be_close(1.0, 1e-12)
     config.outlier_prob.should be_close(0.0, 1e-12)
-    config.proposal.should eq(Tyclone::PhyCloneProposal::SemiAdapted)
+    config.proposal.should eq(UnClone::PhyCloneProposal::SemiAdapted)
     config.thin.should eq(1)
     config.resample_threshold.should be_close(0.5, 1e-12)
     config.seed.should be_nil
@@ -50,13 +50,13 @@ describe Tyclone::PhyCloneRunConfig do
   end
 end
 
-describe Tyclone::CLI do
+describe UnClone::CLI do
   it "parses phy run command" do
-    command = Tyclone::CLI.parse([
+    command = UnClone::CLI.parse([
       "phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "-n", "3", "--num-chains=2",
     ])
-    command.should be_a(Tyclone::PhyCloneRunCommand)
-    config = command.as(Tyclone::PhyCloneRunCommand).config
+    command.should be_a(UnClone::PhyCloneRunCommand)
+    config = command.as(UnClone::PhyCloneRunCommand).config
     config.in_file.should eq("in.tsv")
     config.out_file.should eq("trace.jsonl")
     config.num_iters.should eq(3)
@@ -64,7 +64,7 @@ describe Tyclone::CLI do
   end
 
   it "parses phy run sampler options" do
-    command = Tyclone::CLI.parse([
+    command = UnClone::CLI.parse([
       "phy", "run", "-i", "in.tsv", "-o", "trace.jsonl",
       "--num-particles=12", "--burnin=4", "--max-time=12.5", "--print-freq=7",
       "--thin=3", "--resample-threshold=0.25",
@@ -72,8 +72,8 @@ describe Tyclone::CLI do
       "--no-concentration-update", "--concentration-value=0.5",
       "--proposal=fully-adapted",
     ])
-    command.should be_a(Tyclone::PhyCloneRunCommand)
-    config = command.as(Tyclone::PhyCloneRunCommand).config
+    command.should be_a(UnClone::PhyCloneRunCommand)
+    config = command.as(UnClone::PhyCloneRunCommand).config
     config.num_particles.should eq(12)
     config.burn_in_iters.should eq(4)
     config.max_time.should be_close(12.5, 1e-12)
@@ -83,71 +83,71 @@ describe Tyclone::CLI do
     config.resample_threshold.should be_close(0.25, 1e-12)
     config.concentration_update?.should be_false
     config.concentration_value.should be_close(0.5, 1e-12)
-    config.proposal.should eq(Tyclone::PhyCloneProposal::FullyAdapted)
+    config.proposal.should eq(UnClone::PhyCloneProposal::FullyAdapted)
   end
 
   it "rejects non-positive concentration-value" do
-    expect_raises(Tyclone::CliError, /--concentration-value must be > 0/) do
-      Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--concentration-value=0"])
+    expect_raises(UnClone::CliError, /--concentration-value must be > 0/) do
+      UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--concentration-value=0"])
     end
   end
 
   it "rejects negative num-samples-data-point" do
-    expect_raises(Tyclone::CliError, /--num-samples-data-point must be >= 0/) do
-      Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--num-samples-data-point=-1"])
+    expect_raises(UnClone::CliError, /--num-samples-data-point must be >= 0/) do
+      UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--num-samples-data-point=-1"])
     end
   end
 
   it "rejects negative max-time" do
-    expect_raises(Tyclone::CliError, /--max-time must be >= 0/) do
-      Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--max-time=-1"])
+    expect_raises(UnClone::CliError, /--max-time must be >= 0/) do
+      UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--max-time=-1"])
     end
   end
 
   it "rejects non-positive print-freq" do
-    expect_raises(Tyclone::CliError, /--print-freq must be >= 1/) do
-      Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--print-freq=0"])
+    expect_raises(UnClone::CliError, /--print-freq must be >= 1/) do
+      UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--print-freq=0"])
     end
   end
 
   it "rejects invalid phy proposal option" do
-    expect_raises(Tyclone::CliError, /Invalid proposal: unknown/) do
-      Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--proposal=unknown"])
+    expect_raises(UnClone::CliError, /Invalid proposal: unknown/) do
+      UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--proposal=unknown"])
     end
   end
 
   it "rejects removed custom sampler option" do
-    expect_raises(Tyclone::CliError, /--sampler-mode is not a valid option/) do
-      Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--sampler-mode=unconditional"])
+    expect_raises(UnClone::CliError, /--sampler-mode is not a valid option/) do
+      UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--sampler-mode=unconditional"])
     end
   end
 
   it "rejects removed custom prevalence threshold option" do
-    expect_raises(Tyclone::CliError, /--loss-prevalence-threshold is not a valid option/) do
-      Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--loss-prevalence-threshold=0.12"])
+    expect_raises(UnClone::CliError, /--loss-prevalence-threshold is not a valid option/) do
+      UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--loss-prevalence-threshold=0.12"])
     end
   end
 
   it "rejects removed retained weighting options" do
-    expect_raises(Tyclone::CliError, /--retained-similarity-weight is not a valid option/) do
-      Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--retained-similarity-weight=0.3"])
+    expect_raises(UnClone::CliError, /--retained-similarity-weight is not a valid option/) do
+      UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--retained-similarity-weight=0.3"])
     end
-    expect_raises(Tyclone::CliError, /--retained-score-gap-weight is not a valid option/) do
-      Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--retained-score-gap-weight=0.07"])
+    expect_raises(UnClone::CliError, /--retained-score-gap-weight is not a valid option/) do
+      UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--retained-score-gap-weight=0.07"])
     end
   end
 
   it "requires cluster-file for loss probability compatibility flags" do
-    expect_raises(Tyclone::CliError, /require --cluster-file/) do
-      Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--assign-loss-prob"])
+    expect_raises(UnClone::CliError, /require --cluster-file/) do
+      UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--assign-loss-prob"])
     end
-    expect_raises(Tyclone::CliError, /require --cluster-file/) do
-      Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--user-provided-loss-prob"])
+    expect_raises(UnClone::CliError, /require --cluster-file/) do
+      UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "trace.jsonl", "--user-provided-loss-prob"])
     end
   end
 
   it "parses loss probability compatibility flags with cluster-file" do
-    command = Tyclone::CLI.parse([
+    command = UnClone::CLI.parse([
       "phy", "run",
       "-i", "in.tsv",
       "-o", "trace.jsonl",
@@ -157,8 +157,8 @@ describe Tyclone::CLI do
       "--high-loss-prob=0.4",
     ])
 
-    command.should be_a(Tyclone::PhyCloneRunCommand)
-    config = command.as(Tyclone::PhyCloneRunCommand).config
+    command.should be_a(UnClone::PhyCloneRunCommand)
+    config = command.as(UnClone::PhyCloneRunCommand).config
     config.assign_loss_prob?.should be_true
     config.user_provided_loss_prob?.should be_false
     config.cluster_file.should eq("clusters.tsv")
@@ -167,50 +167,50 @@ describe Tyclone::CLI do
   end
 
   it "shows phy root help" do
-    command = Tyclone::CLI.parse(["phy", "--help"])
-    command.should be_a(Tyclone::HelpCommand)
-    command.as(Tyclone::HelpCommand).help_message.should contain("tyclone phy <subcommand>")
+    command = UnClone::CLI.parse(["phy", "--help"])
+    command.should be_a(UnClone::HelpCommand)
+    command.as(UnClone::HelpCommand).help_message.should contain("unclone phy <subcommand>")
   end
 
   it "parses phy map command" do
-    command = Tyclone::CLI.parse(["phy", "map", "-i", "trace.jsonl", "-o", "map.json"])
-    command.should be_a(Tyclone::PhyCloneMapCommand)
-    config = command.as(Tyclone::PhyCloneMapCommand).config
+    command = UnClone::CLI.parse(["phy", "map", "-i", "trace.jsonl", "-o", "map.json"])
+    command.should be_a(UnClone::PhyCloneMapCommand)
+    config = command.as(UnClone::PhyCloneMapCommand).config
     config.in_file.should eq("trace.jsonl")
     config.out_file.should eq("map.json")
   end
 
   it "parses phy consensus command" do
-    command = Tyclone::CLI.parse(["phy", "consensus", "-i", "trace.jsonl", "-o", "consensus.json"])
-    command.should be_a(Tyclone::PhyCloneConsensusCommand)
-    config = command.as(Tyclone::PhyCloneConsensusCommand).config
+    command = UnClone::CLI.parse(["phy", "consensus", "-i", "trace.jsonl", "-o", "consensus.json"])
+    command.should be_a(UnClone::PhyCloneConsensusCommand)
+    config = command.as(UnClone::PhyCloneConsensusCommand).config
     config.in_file.should eq("trace.jsonl")
     config.out_file.should eq("consensus.json")
   end
 
   it "parses phy topology-report command" do
-    command = Tyclone::CLI.parse(["phy", "topology-report", "-i", "trace.jsonl", "-o", "report.json"])
-    command.should be_a(Tyclone::PhyCloneTopologyReportCommand)
-    config = command.as(Tyclone::PhyCloneTopologyReportCommand).config
+    command = UnClone::CLI.parse(["phy", "topology-report", "-i", "trace.jsonl", "-o", "report.json"])
+    command.should be_a(UnClone::PhyCloneTopologyReportCommand)
+    config = command.as(UnClone::PhyCloneTopologyReportCommand).config
     config.in_file.should eq("trace.jsonl")
     config.out_file.should eq("report.json")
   end
 end
 
-describe Tyclone::PhyClone do
+describe UnClone::PhyClone do
   it "writes a minimal JSONL trace for phy run" do
-    input_path = File.join(Dir.tempdir, "tyclone-phy-input-#{UUID.random}.tsv")
-    output_path = File.join(Dir.tempdir, "tyclone-phy-trace-#{UUID.random}.jsonl")
+    input_path = File.join(Dir.tempdir, "unclone-phy-input-#{UUID.random}.tsv")
+    output_path = File.join(Dir.tempdir, "unclone-phy-trace-#{UUID.random}.jsonl")
     write_phy_input(input_path)
 
-    config = Tyclone::PhyCloneRunConfig.new
+    config = UnClone::PhyCloneRunConfig.new
     config.in_file = input_path
     config.out_file = output_path
     config.num_iters = 8
     config.num_chains = 1
     config.seed = 17_u64
 
-    Tyclone::Run.execute(config)
+    UnClone::Run.execute(config)
 
     lines = File.read_lines(output_path)
     lines.size.should eq(8)
@@ -228,27 +228,27 @@ describe Tyclone::PhyClone do
   end
 
   it "is deterministic for phy run when seed is fixed" do
-    input_path = File.join(Dir.tempdir, "tyclone-phy-input-#{UUID.random}.tsv")
-    output_path_a = File.join(Dir.tempdir, "tyclone-phy-trace-a-#{UUID.random}.jsonl")
-    output_path_b = File.join(Dir.tempdir, "tyclone-phy-trace-b-#{UUID.random}.jsonl")
+    input_path = File.join(Dir.tempdir, "unclone-phy-input-#{UUID.random}.tsv")
+    output_path_a = File.join(Dir.tempdir, "unclone-phy-trace-a-#{UUID.random}.jsonl")
+    output_path_b = File.join(Dir.tempdir, "unclone-phy-trace-b-#{UUID.random}.jsonl")
     write_phy_input(input_path)
 
-    config_a = Tyclone::PhyCloneRunConfig.new
+    config_a = UnClone::PhyCloneRunConfig.new
     config_a.in_file = input_path
     config_a.out_file = output_path_a
     config_a.num_iters = 8
     config_a.num_chains = 1
     config_a.seed = 17_u64
 
-    config_b = Tyclone::PhyCloneRunConfig.new
+    config_b = UnClone::PhyCloneRunConfig.new
     config_b.in_file = input_path
     config_b.out_file = output_path_b
     config_b.num_iters = 8
     config_b.num_chains = 1
     config_b.seed = 17_u64
 
-    Tyclone::Run.execute(config_a)
-    Tyclone::Run.execute(config_b)
+    UnClone::Run.execute(config_a)
+    UnClone::Run.execute(config_b)
 
     File.read(output_path_a).should eq(File.read(output_path_b))
   ensure
@@ -258,25 +258,25 @@ describe Tyclone::PhyClone do
   end
 
   it "builds a minimal map summary from a trace" do
-    input_path = File.join(Dir.tempdir, "tyclone-phy-input-#{UUID.random}.tsv")
-    trace_path = File.join(Dir.tempdir, "tyclone-phy-trace-#{UUID.random}.jsonl")
-    map_path = File.join(Dir.tempdir, "tyclone-phy-map-#{UUID.random}.json")
+    input_path = File.join(Dir.tempdir, "unclone-phy-input-#{UUID.random}.tsv")
+    trace_path = File.join(Dir.tempdir, "unclone-phy-trace-#{UUID.random}.jsonl")
+    map_path = File.join(Dir.tempdir, "unclone-phy-map-#{UUID.random}.json")
     write_phy_input(input_path)
 
-    run_config = Tyclone::PhyCloneRunConfig.new
+    run_config = UnClone::PhyCloneRunConfig.new
     run_config.in_file = input_path
     run_config.out_file = trace_path
     run_config.num_iters = 8
     run_config.num_chains = 1
     run_config.seed = 17_u64
 
-    Tyclone::Run.execute(run_config)
+    UnClone::Run.execute(run_config)
 
-    map_config = Tyclone::PhyCloneMapConfig.new
+    map_config = UnClone::PhyCloneMapConfig.new
     map_config.in_file = trace_path
     map_config.out_file = map_path
 
-    Tyclone::Run.execute(map_config)
+    UnClone::Run.execute(map_config)
 
     result = JSON.parse(File.read(map_path))
     result["schema_version"].as_i.should eq(1)
@@ -303,25 +303,25 @@ describe Tyclone::PhyClone do
   end
 
   it "builds a minimal consensus summary from a trace" do
-    input_path = File.join(Dir.tempdir, "tyclone-phy-input-#{UUID.random}.tsv")
-    trace_path = File.join(Dir.tempdir, "tyclone-phy-trace-#{UUID.random}.jsonl")
-    consensus_path = File.join(Dir.tempdir, "tyclone-phy-consensus-#{UUID.random}.json")
+    input_path = File.join(Dir.tempdir, "unclone-phy-input-#{UUID.random}.tsv")
+    trace_path = File.join(Dir.tempdir, "unclone-phy-trace-#{UUID.random}.jsonl")
+    consensus_path = File.join(Dir.tempdir, "unclone-phy-consensus-#{UUID.random}.json")
     write_phy_input(input_path)
 
-    run_config = Tyclone::PhyCloneRunConfig.new
+    run_config = UnClone::PhyCloneRunConfig.new
     run_config.in_file = input_path
     run_config.out_file = trace_path
     run_config.num_iters = 8
     run_config.num_chains = 2
     run_config.seed = 17_u64
 
-    Tyclone::Run.execute(run_config)
+    UnClone::Run.execute(run_config)
 
-    consensus_config = Tyclone::PhyCloneConsensusConfig.new
+    consensus_config = UnClone::PhyCloneConsensusConfig.new
     consensus_config.in_file = trace_path
     consensus_config.out_file = consensus_path
 
-    Tyclone::Run.execute(consensus_config)
+    UnClone::Run.execute(consensus_config)
 
     result = JSON.parse(File.read(consensus_path))
     result["schema_version"].as_i.should eq(1)
@@ -352,25 +352,25 @@ describe Tyclone::PhyClone do
   end
 
   it "builds a minimal topology report from a trace" do
-    input_path = File.join(Dir.tempdir, "tyclone-phy-input-#{UUID.random}.tsv")
-    trace_path = File.join(Dir.tempdir, "tyclone-phy-trace-#{UUID.random}.jsonl")
-    report_path = File.join(Dir.tempdir, "tyclone-phy-topology-report-#{UUID.random}.json")
+    input_path = File.join(Dir.tempdir, "unclone-phy-input-#{UUID.random}.tsv")
+    trace_path = File.join(Dir.tempdir, "unclone-phy-trace-#{UUID.random}.jsonl")
+    report_path = File.join(Dir.tempdir, "unclone-phy-topology-report-#{UUID.random}.json")
     write_phy_input(input_path)
 
-    run_config = Tyclone::PhyCloneRunConfig.new
+    run_config = UnClone::PhyCloneRunConfig.new
     run_config.in_file = input_path
     run_config.out_file = trace_path
     run_config.num_iters = 8
     run_config.num_chains = 2
     run_config.seed = 17_u64
 
-    Tyclone::Run.execute(run_config)
+    UnClone::Run.execute(run_config)
 
-    report_config = Tyclone::PhyCloneTopologyReportConfig.new
+    report_config = UnClone::PhyCloneTopologyReportConfig.new
     report_config.in_file = trace_path
     report_config.out_file = report_path
 
-    Tyclone::Run.execute(report_config)
+    UnClone::Run.execute(report_config)
 
     result = JSON.parse(File.read(report_path))
     result["schema_version"].as_i.should eq(1)
@@ -392,19 +392,19 @@ describe Tyclone::PhyClone do
   end
 
   it "rejects unsupported phy trace schema versions" do
-    trace_path = File.join(Dir.tempdir, "tyclone-phy-invalid-trace-#{UUID.random}.jsonl")
-    map_path = File.join(Dir.tempdir, "tyclone-phy-invalid-map-#{UUID.random}.json")
+    trace_path = File.join(Dir.tempdir, "unclone-phy-invalid-trace-#{UUID.random}.jsonl")
+    map_path = File.join(Dir.tempdir, "unclone-phy-invalid-map-#{UUID.random}.json")
 
     File.write(trace_path, <<-JSONL)
       {"schema_version":999,"chain":0,"iter":0,"log_p":-2.0,"topology_id":"star-1","tree":{"nodes":[{"id":"root","kind":"root"},{"id":"cluster-0","kind":"cluster","cluster_id":0}],"edges":[{"parent":"root","child":"cluster-0"}]},"clusters":[{"cluster_id":0,"mutation_ids":["m0"],"sample_ids":["s0"]}]}
       JSONL
 
-    config = Tyclone::PhyCloneMapConfig.new
+    config = UnClone::PhyCloneMapConfig.new
     config.in_file = trace_path
     config.out_file = map_path
 
-    expect_raises(Tyclone::CliError, /Unsupported phy trace schema_version/) do
-      Tyclone::Run.execute(config)
+    expect_raises(UnClone::CliError, /Unsupported phy trace schema_version/) do
+      UnClone::Run.execute(config)
     end
   ensure
     File.delete?(trace_path.as(String))
@@ -412,18 +412,18 @@ describe Tyclone::PhyClone do
   end
 
   it "emits internal cluster edges for three-cluster phy run" do
-    input_path = File.join(Dir.tempdir, "tyclone-phy-input-three-#{UUID.random}.tsv")
-    trace_path = File.join(Dir.tempdir, "tyclone-phy-trace-three-#{UUID.random}.jsonl")
+    input_path = File.join(Dir.tempdir, "unclone-phy-input-three-#{UUID.random}.tsv")
+    trace_path = File.join(Dir.tempdir, "unclone-phy-trace-three-#{UUID.random}.jsonl")
     write_phy_input_three_clusters(input_path)
 
-    config = Tyclone::PhyCloneRunConfig.new
+    config = UnClone::PhyCloneRunConfig.new
     config.in_file = input_path
     config.out_file = trace_path
     config.num_iters = 24
     config.num_chains = 1
     config.seed = 23_u64
 
-    Tyclone::Run.execute(config)
+    UnClone::Run.execute(config)
 
     # SMC generates various topologies; at least check that some iterations have clusters
     has_any_cluster_node = File.read_lines(trace_path).any? do |line|
@@ -440,11 +440,11 @@ describe Tyclone::PhyClone do
   end
 
   it "runs SMC sampler with burn-in and emits post-burnin main chain trace" do
-    input_path = File.join(Dir.tempdir, "tyclone-phy-smc-input-#{UUID.random}.tsv")
-    trace_path = File.join(Dir.tempdir, "tyclone-phy-smc-trace-#{UUID.random}.jsonl")
+    input_path = File.join(Dir.tempdir, "unclone-phy-smc-input-#{UUID.random}.tsv")
+    trace_path = File.join(Dir.tempdir, "unclone-phy-smc-trace-#{UUID.random}.jsonl")
     write_phy_input_three_clusters(input_path)
 
-    run_config = Tyclone::PhyCloneRunConfig.new
+    run_config = UnClone::PhyCloneRunConfig.new
     run_config.in_file = input_path
     run_config.out_file = trace_path
     run_config.num_iters = 5
@@ -453,7 +453,7 @@ describe Tyclone::PhyClone do
     run_config.num_particles = 10
     run_config.burn_in_iters = 3
 
-    Tyclone::Run.execute(run_config)
+    UnClone::Run.execute(run_config)
 
     trace_records = File.read_lines(trace_path).map { |line| JSON.parse(line) }
 
@@ -477,12 +477,12 @@ describe Tyclone::PhyClone do
   end
 
   it "applies thin as recording interval in phy main chain" do
-    input_path = File.join(Dir.tempdir, "tyclone-phy-thin-input-#{UUID.random}.tsv")
-    trace_path_thin1 = File.join(Dir.tempdir, "tyclone-phy-thin1-trace-#{UUID.random}.jsonl")
-    trace_path_thin2 = File.join(Dir.tempdir, "tyclone-phy-thin2-trace-#{UUID.random}.jsonl")
+    input_path = File.join(Dir.tempdir, "unclone-phy-thin-input-#{UUID.random}.tsv")
+    trace_path_thin1 = File.join(Dir.tempdir, "unclone-phy-thin1-trace-#{UUID.random}.jsonl")
+    trace_path_thin2 = File.join(Dir.tempdir, "unclone-phy-thin2-trace-#{UUID.random}.jsonl")
     write_phy_input_three_clusters(input_path)
 
-    run_config = Tyclone::PhyCloneRunConfig.new
+    run_config = UnClone::PhyCloneRunConfig.new
     run_config.in_file = input_path
     run_config.out_file = trace_path_thin1
     run_config.num_iters = 5
@@ -492,12 +492,12 @@ describe Tyclone::PhyClone do
     run_config.burn_in_iters = 3
     run_config.thin = 1
 
-    Tyclone::Run.execute(run_config)
+    UnClone::Run.execute(run_config)
 
     run_config.out_file = trace_path_thin2
     run_config.thin = 2
 
-    Tyclone::Run.execute(run_config)
+    UnClone::Run.execute(run_config)
 
     thin1 = File.read_lines(trace_path_thin1).map { |line| JSON.parse(line) }
     thin2 = File.read_lines(trace_path_thin2).map { |line| JSON.parse(line) }
@@ -516,13 +516,13 @@ describe Tyclone::PhyClone do
   end
 
   it "emits identical trace counts for num_particles=1 vs particles > 1" do
-    input_path = File.join(Dir.tempdir, "tyclone-phy-parity-input-#{UUID.random}.tsv")
-    trace_path_single = File.join(Dir.tempdir, "tyclone-phy-parity-single-#{UUID.random}.jsonl")
-    trace_path_multi = File.join(Dir.tempdir, "tyclone-phy-parity-multi-#{UUID.random}.jsonl")
+    input_path = File.join(Dir.tempdir, "unclone-phy-parity-input-#{UUID.random}.tsv")
+    trace_path_single = File.join(Dir.tempdir, "unclone-phy-parity-single-#{UUID.random}.jsonl")
+    trace_path_multi = File.join(Dir.tempdir, "unclone-phy-parity-multi-#{UUID.random}.jsonl")
     write_phy_input_three_clusters(input_path)
 
     # Single particle run
-    run_config = Tyclone::PhyCloneRunConfig.new
+    run_config = UnClone::PhyCloneRunConfig.new
     run_config.in_file = input_path
     run_config.out_file = trace_path_single
     run_config.num_iters = 8
@@ -531,13 +531,13 @@ describe Tyclone::PhyClone do
     run_config.num_particles = 1
     run_config.burn_in_iters = 0
 
-    Tyclone::Run.execute(run_config)
+    UnClone::Run.execute(run_config)
 
     # Multi particle run (same config but more particles)
     run_config.out_file = trace_path_multi
     run_config.num_particles = 5
 
-    Tyclone::Run.execute(run_config)
+    UnClone::Run.execute(run_config)
 
     single_trace = File.read_lines(trace_path_single).map { |line| JSON.parse(line) }
     multi_trace = File.read_lines(trace_path_multi).map { |line| JSON.parse(line) }
@@ -561,9 +561,9 @@ describe Tyclone::PhyClone do
   end
 
   it "runs assign-loss-prob mode with cluster-file" do
-    input_path = File.join(Dir.tempdir, "tyclone-phy-prev-input-#{UUID.random}.tsv")
-    cluster_path = File.join(Dir.tempdir, "tyclone-phy-prev-cluster-#{UUID.random}.tsv")
-    trace_path = File.join(Dir.tempdir, "tyclone-phy-prev-trace-#{UUID.random}.jsonl")
+    input_path = File.join(Dir.tempdir, "unclone-phy-prev-input-#{UUID.random}.tsv")
+    cluster_path = File.join(Dir.tempdir, "unclone-phy-prev-cluster-#{UUID.random}.tsv")
+    trace_path = File.join(Dir.tempdir, "unclone-phy-prev-trace-#{UUID.random}.jsonl")
     write_phy_input_three_clusters(input_path)
 
     # Cluster file with cellular_prevalence — low prevalence on m2 triggers high loss
@@ -574,7 +574,7 @@ describe Tyclone::PhyClone do
       m2\t2\t0.02
       TSV
 
-    run_config = Tyclone::PhyCloneRunConfig.new
+    run_config = UnClone::PhyCloneRunConfig.new
     run_config.in_file = input_path
     run_config.out_file = trace_path
     run_config.cluster_file = cluster_path
@@ -585,7 +585,7 @@ describe Tyclone::PhyClone do
     run_config.loss_prob = 0.05
     run_config.high_loss_prob = 0.4
 
-    Tyclone::Run.execute(run_config)
+    UnClone::Run.execute(run_config)
 
     trace_records = File.read_lines(trace_path).map { |line| JSON.parse(line) }
     trace_records.size.should eq(5)
@@ -600,9 +600,9 @@ describe Tyclone::PhyClone do
   end
 
   it "accepts string cluster_id in cluster-file and groups mutations correctly" do
-    input_path = File.join(Dir.tempdir, "tyclone-phy-strcid-input-#{UUID.random}.tsv")
-    cluster_path = File.join(Dir.tempdir, "tyclone-phy-strcid-cluster-#{UUID.random}.tsv")
-    trace_path = File.join(Dir.tempdir, "tyclone-phy-strcid-trace-#{UUID.random}.jsonl")
+    input_path = File.join(Dir.tempdir, "unclone-phy-strcid-input-#{UUID.random}.tsv")
+    cluster_path = File.join(Dir.tempdir, "unclone-phy-strcid-cluster-#{UUID.random}.tsv")
+    trace_path = File.join(Dir.tempdir, "unclone-phy-strcid-trace-#{UUID.random}.jsonl")
 
     # Input without inline cluster_id: cluster assignment comes from cluster-file only
     File.write(input_path, <<-TSV)
@@ -623,7 +623,7 @@ describe Tyclone::PhyClone do
       m2\tcloneB
       TSV
 
-    run_config = Tyclone::PhyCloneRunConfig.new
+    run_config = UnClone::PhyCloneRunConfig.new
     run_config.in_file = input_path
     run_config.out_file = trace_path
     run_config.cluster_file = cluster_path
@@ -631,7 +631,7 @@ describe Tyclone::PhyClone do
     run_config.num_chains = 1
     run_config.seed = 42_u64
 
-    Tyclone::Run.execute(run_config)
+    UnClone::Run.execute(run_config)
 
     trace_records = File.read_lines(trace_path).map { |line| JSON.parse(line) }
     trace_records.size.should eq(3)
@@ -652,8 +652,8 @@ describe Tyclone::PhyClone do
   end
 
   it "accepts --outlier-prob CLI option" do
-    result = Tyclone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "out.jsonl", "--outlier-prob=0.01"])
-    run_cmd = result.as(Tyclone::PhyCloneRunCommand)
+    result = UnClone::CLI.parse(["phy", "run", "-i", "in.tsv", "-o", "out.jsonl", "--outlier-prob=0.01"])
+    run_cmd = result.as(UnClone::PhyCloneRunCommand)
     run_cmd.config.outlier_prob.should be_close(0.01, 1e-10)
   end
 end

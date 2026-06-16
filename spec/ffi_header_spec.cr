@@ -4,7 +4,7 @@ describe "FFI header" do
   it "stays aligned with the current exported kernel ABI" do
     # Normalize line endings so the spec is agnostic to CRLF checkouts (e.g. Windows CI).
     header = File.read(File.expand_path("../rust-kernel/include/pcv_kernel.h", __DIR__)).gsub("\r\n", "\n")
-    crystal_ffi = File.read(File.expand_path("../src/tyclone/ffi.cr", __DIR__)).gsub("\r\n", "\n")
+    crystal_ffi = File.read(File.expand_path("../src/unclone/ffi.cr", __DIR__)).gsub("\r\n", "\n")
 
     header_functions = header.scan(/(?:int|size_t|void|const\s+(?:char|int32_t|double)\*)\s+(pcv_\w+)\s*\(/).map(&.[1]).sort
     crystal_functions = crystal_ffi.scan(/fun\s+\w+\s*=\s*(pcv_\w+)\s*\(/).map(&.[1]).sort

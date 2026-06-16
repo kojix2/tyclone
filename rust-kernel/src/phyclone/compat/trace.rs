@@ -53,7 +53,7 @@ pub struct CompatOutlierAssignment {
     pub mutation_id: String,
     pub is_outlier: bool,
     /// Log-odds of outlier vs in-tree assignment.
-    /// `None` when not computed (tyclone does not currently compute this value).
+    /// `None` when not computed (unclone does not currently compute this value).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub log_odds_outlier_vs_in_tree: Option<f64>,
 }
@@ -257,7 +257,7 @@ fn tree_to_trace_record(
     let topology_id = format!("smc-{}", edge_keys.join("|"));
 
     // Build outlier assignments.
-    // log_odds_outlier_vs_in_tree is not computed by tyclone; emit None to avoid misleading 0.0.
+    // log_odds_outlier_vs_in_tree is not computed by unclone; emit None to avoid misleading 0.0.
     let outlier_assignments: Vec<CompatOutlierAssignment> = data_points
         .iter()
         .flat_map(|dp| dp.mutation_ids.iter().map(move |m| (dp.idx, m)))
@@ -408,7 +408,7 @@ fn mcmc_sample_to_trace_record(
     edge_keys.sort();
     let topology_id = format!("smc-{}", edge_keys.join("|"));
 
-    // log_odds_outlier_vs_in_tree is not computed by tyclone; emit None to avoid misleading 0.0.
+    // log_odds_outlier_vs_in_tree is not computed by unclone; emit None to avoid misleading 0.0.
     let outlier_assignments: Vec<CompatOutlierAssignment> = data_points
         .iter()
         .flat_map(|dp| dp.mutation_ids.iter().map(move |m| (dp.idx, m)))

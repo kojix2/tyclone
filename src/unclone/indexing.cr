@@ -1,4 +1,4 @@
-module Tyclone
+module UnClone
   struct IndexedRow
     getter mutation_index : Int32
     getter sample_index : Int32

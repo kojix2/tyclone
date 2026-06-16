@@ -1,4 +1,4 @@
-CRYSTAL_BIN := bin/tyclone
+CRYSTAL_BIN := bin/unclone
 CRYSTAL_ENTRYPOINT := src/main.cr
 RUST_DIR := rust-kernel
 RUST_LIB_DIR := $(RUST_DIR)/target/release
@@ -31,7 +31,7 @@ CRYSTAL_BUILD_FLAGS := $(CRYSTAL_RELEASE_FLAGS) $(EXTRA_CRYSTAL_BUILD_FLAGS)
 all: build
 
 help:
-	@echo "tyclone Make targets"
+	@echo "unclone Make targets"
 	@echo "  make help         Show this help"
 	@echo "  make build        Build Rust kernel and Crystal CLI"
 	@echo "  make build release=1"

@@ -1,4 +1,4 @@
-module Tyclone
+module UnClone
   module PhyCloneKernel
     def self.generate_trace(
       rows : Array(PhyClone::InputRow),

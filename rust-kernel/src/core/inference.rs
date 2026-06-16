@@ -66,7 +66,7 @@ pub struct FitDetailProfile {
 impl FitProfile {
     fn print_summary(&self) {
         eprintln!(
-            "[tyclone-profile] iterations={} initial_elbo_ms={:.3} update_z_ms={:.3} update_pi_ms={:.3} update_theta_ms={:.3} iter_elbo_ms={:.3}",
+            "[unclone-profile] iterations={} initial_elbo_ms={:.3} update_z_ms={:.3} update_pi_ms={:.3} update_theta_ms={:.3} iter_elbo_ms={:.3}",
             self.iterations,
             self.initial_elbo.as_secs_f64() * 1_000.0,
             self.update_z.as_secs_f64() * 1_000.0,
@@ -80,7 +80,7 @@ impl FitProfile {
 impl FitDetailProfile {
     fn print_summary(&self) {
         eprintln!(
-            "[tyclone-fit-detail] update_z_contract_ms={:.3} update_z_normalize_ms={:.3} update_theta_contract_ms={:.3} update_theta_normalize_ms={:.3} elbo_e_log_p_ms={:.3} elbo_e_log_q_ms={:.3} e_log_p_z_sums_ms={:.3} e_log_p_pi_term_ms={:.3} e_log_p_theta_prior_ms={:.3} e_log_p_data_theta_ms={:.3} e_log_p_data_accum_ms={:.3} e_log_q_pi_term_ms={:.3} e_log_q_theta_term_ms={:.3} e_log_q_z_term_ms={:.3}",
+            "[unclone-fit-detail] update_z_contract_ms={:.3} update_z_normalize_ms={:.3} update_theta_contract_ms={:.3} update_theta_normalize_ms={:.3} elbo_e_log_p_ms={:.3} elbo_e_log_q_ms={:.3} e_log_p_z_sums_ms={:.3} e_log_p_pi_term_ms={:.3} e_log_p_theta_prior_ms={:.3} e_log_p_data_theta_ms={:.3} e_log_p_data_accum_ms={:.3} e_log_q_pi_term_ms={:.3} e_log_q_theta_term_ms={:.3} e_log_q_z_term_ms={:.3}",
             self.update_z_contract.as_secs_f64() * 1_000.0,
             self.update_z_normalize.as_secs_f64() * 1_000.0,
             self.update_theta_contract.as_secs_f64() * 1_000.0,

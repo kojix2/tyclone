@@ -88,7 +88,7 @@ jobs:
             VERSION="build-$(date +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}"
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "BIN=tyclone" >> "$GITHUB_ENV"
+          echo "BIN=unclone" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         if: matrix.target != 'x86_64-pc-windows-gnu'
@@ -119,19 +119,19 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         shell: bash
         run: |
-          docker run -d --name tyclone-alpine -v "$PWD":/workspace -w /workspace crystallang/crystal:latest-alpine tail -f /dev/null
-          trap 'docker rm -f tyclone-alpine' EXIT
-          docker exec tyclone-alpine apk add --no-cache build-base readline-dev readline-static ncurses-dev ncurses-static ncurses-libs rust cargo make
+          docker run -d --name unclone-alpine -v "$PWD":/workspace -w /workspace crystallang/crystal:latest-alpine tail -f /dev/null
+          trap 'docker rm -f unclone-alpine' EXIT
+          docker exec unclone-alpine apk add --no-cache build-base readline-dev readline-static ncurses-dev ncurses-static ncurses-libs rust cargo make
           mkdir -p .home .cargo .rustup
-          docker exec -u "$(id -u):$(id -g)" -e HOME=/workspace/.home -e CARGO_HOME=/workspace/.cargo -e RUSTUP_HOME=/workspace/.rustup tyclone-alpine shards install --without-development
-          docker exec -u "$(id -u):$(id -g)" -e HOME=/workspace/.home -e CARGO_HOME=/workspace/.cargo -e RUSTUP_HOME=/workspace/.rustup tyclone-alpine make build release=1 EXTRA_CRYSTAL_BUILD_FLAGS="--static"
+          docker exec -u "$(id -u):$(id -g)" -e HOME=/workspace/.home -e CARGO_HOME=/workspace/.cargo -e RUSTUP_HOME=/workspace/.rustup unclone-alpine shards install --without-development
+          docker exec -u "$(id -u):$(id -g)" -e HOME=/workspace/.home -e CARGO_HOME=/workspace/.cargo -e RUSTUP_HOME=/workspace/.rustup unclone-alpine make build release=1 EXTRA_CRYSTAL_BUILD_FLAGS="--static"
 
       - name: Build release binary (Linux host check)
         if: matrix.target == 'x86_64-unknown-linux-musl'
         shell: bash
         run: |
-          ldd ./bin/tyclone || echo "Static binary (no dynamic dependencies)"
-          file ./bin/tyclone
+          ldd ./bin/unclone || echo "Static binary (no dynamic dependencies)"
+          file ./bin/unclone
 
       - name: Build release binary (macOS)
         if: matrix.target == 'aarch64-apple-darwin'
@@ -148,8 +148,8 @@ jobs:
       - name: Smoke test binary
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
-          ./bin/tyclone --help
-          LDD_OUTPUT="$(ldd ./bin/tyclone 2>&1 || true)"
+          ./bin/unclone --help
+          LDD_OUTPUT="$(ldd ./bin/unclone 2>&1 || true)"
           printf '%s\n' "$LDD_OUTPUT"
           if printf '%s\n' "$LDD_OUTPUT" | grep -F 'libpcv_kernel.so'; then
             echo "Error: dynamic dependency on libpcv_kernel.so detected"
@@ -160,9 +160,9 @@ jobs:
         if: matrix.target == 'aarch64-apple-darwin'
         shell: bash
         run: |
-          ./bin/tyclone --help
-          otool -L ./bin/tyclone
-          if otool -L ./bin/tyclone | grep -E '/opt/homebrew|/usr/local/Cellar'; then
+          ./bin/unclone --help
+          otool -L ./bin/unclone
+          if otool -L ./bin/unclone | grep -E '/opt/homebrew|/usr/local/Cellar'; then
             echo "Error: Homebrew dynamic dependencies detected"
             exit 1
           fi
@@ -170,14 +170,14 @@ jobs:
       - name: Smoke test binary (MinGW64)
         if: matrix.target == 'x86_64-pc-windows-gnu'
         shell: msys2 {0}
-        run: ./bin/tyclone.exe --help
+        run: ./bin/unclone.exe --help
 
       - name: Package artifact
         if: matrix.target != 'x86_64-pc-windows-gnu'
         run: |
-          PKG="tyclone-${VERSION}-${{ matrix.target }}"
+          PKG="unclone-${VERSION}-${{ matrix.target }}"
           mkdir -p "$PKG"
-          cp ./bin/tyclone "$PKG/"
+          cp ./bin/unclone "$PKG/"
           cp LICENSE "$PKG/"
           cp README.md "$PKG/"
           tar czf "$PKG.tar.gz" "$PKG"
@@ -186,9 +186,9 @@ jobs:
         if: matrix.target == 'x86_64-pc-windows-gnu'
         shell: msys2 {0}
         run: |
-          PKG="tyclone-${VERSION}-${{ matrix.target }}"
+          PKG="unclone-${VERSION}-${{ matrix.target }}"
           mkdir -p "$PKG"
-          cp ./bin/tyclone.exe "$PKG/"
+          cp ./bin/unclone.exe "$PKG/"
           cp LICENSE "$PKG/"
           cp README.md "$PKG/"
           zip -r "$PKG.zip" "$PKG"
@@ -196,15 +196,15 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: tyclone-${{ matrix.target }}
+          name: unclone-${{ matrix.target }}
           path: |
-            tyclone-*.tar.gz
-            tyclone-*.zip
+            unclone-*.tar.gz
+            unclone-*.zip
 
       - name: Upload release assets
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            tyclone-*.tar.gz
-            tyclone-*.zip
+            unclone-*.tar.gz
+            unclone-*.zip

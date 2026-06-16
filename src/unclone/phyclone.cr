@@ -2,7 +2,7 @@ require "csv"
 require "json"
 require "compress/gzip"
 
-module Tyclone
+module UnClone
   module PhyClone
     TRACE_SCHEMA_VERSION = 1
     TRACE_ROOT_ID        = "root"
@@ -55,7 +55,7 @@ module Tyclone
     struct OutlierAssignment
       getter mutation_id : String
       getter? outlier : Bool
-      # nil when not computed by tyclone (field is omitted from JSON output in that case)
+      # nil when not computed by unclone (field is omitted from JSON output in that case)
       getter log_odds_outlier_vs_in_tree : Float64?
 
       def initialize(
@@ -575,7 +575,7 @@ module Tyclone
                   json.object do
                     json.field "mutation_id", assignment.mutation_id
                     json.field "is_outlier", assignment.outlier?
-                    # Omit log_odds_outlier_vs_in_tree when nil (not computed by tyclone)
+                    # Omit log_odds_outlier_vs_in_tree when nil (not computed by unclone)
                     if log_odds = assignment.log_odds_outlier_vs_in_tree
                       json.field "log_odds_outlier_vs_in_tree", log_odds
                     end
@@ -1373,7 +1373,7 @@ module Tyclone
       log_p_one = document["log_p_one"]?.try(&.as_f?) || log_p
       outlier_assignments = document["outlier_assignments"]?.try(&.as_a).try do |items|
         items.map do |item|
-          # log_odds_outlier_vs_in_tree is optional (omitted when not computed by tyclone)
+          # log_odds_outlier_vs_in_tree is optional (omitted when not computed by unclone)
           log_odds = item["log_odds_outlier_vs_in_tree"]?.try(&.as_f?)
           OutlierAssignment.new(
             item["mutation_id"].as_s,

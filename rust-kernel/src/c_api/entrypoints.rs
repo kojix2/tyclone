@@ -81,7 +81,7 @@ impl KernelProfile {
         num_samples: usize,
     ) {
         eprintln!(
-            "[tyclone-kernel-profile] kernel_threads={} restart_parallelism={} num_restarts={} num_mutations={} num_samples={} ccf_grid_ms={:.3} log_p_data_ms={:.3} priors_ms={:.3} data_preproc_ms={:.3} restarts_ms={:.3} result_build_ms={:.3} total_ms={:.3}",
+            "[unclone-kernel-profile] kernel_threads={} restart_parallelism={} num_restarts={} num_mutations={} num_samples={} ccf_grid_ms={:.3} log_p_data_ms={:.3} priors_ms={:.3} data_preproc_ms={:.3} restarts_ms={:.3} result_build_ms={:.3} total_ms={:.3}",
             kernel_threads,
             restart_parallelism,
             num_restarts,
@@ -291,7 +291,7 @@ pub(crate) fn run_vi_request(
     for outcome in &restart_outcomes {
         if cfg.print_freq > 0 {
             eprintln!(
-                "[tyclone] restart={} seed={} final_elbo={} used_clusters={}",
+                "[unclone] restart={} seed={} final_elbo={} used_clusters={}",
                 outcome.metric.restart_index,
                 outcome.metric.restart_seed,
                 outcome.metric.final_elbo,
@@ -308,7 +308,7 @@ pub(crate) fn run_vi_request(
 
     if cfg.print_freq > 0 {
         eprintln!(
-            "[tyclone] best_restart={} best_final_elbo={}",
+            "[unclone] best_restart={} best_final_elbo={}",
             best_restart_index, best_elbo
         );
     }

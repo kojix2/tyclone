@@ -1,11 +1,11 @@
 require "./spec_helper"
 
 private def default_config
-  config = Tyclone::ViConfig.new
+  config = UnClone::ViConfig.new
   config.in_file = "in.tsv"
   config.out_file = "out.tsv"
   config.num_clusters = 10
-  config.density = Tyclone::Density::BetaBinomial
+  config.density = UnClone::Density::BetaBinomial
   config.num_grid_points = 100
   config.num_restarts = 1
   config.convergence_threshold = 1e-6
@@ -20,10 +20,10 @@ private def default_config
   config
 end
 
-describe Tyclone::Kernel do
+describe UnClone::Kernel do
   it "propagates kernel errors" do
-    expect_raises(Tyclone::KernelError, /config or rows is null/) do
-      Tyclone::Kernel.fit(default_config, [] of Tyclone::IndexedRow, 0, 0)
+    expect_raises(UnClone::KernelError, /config or rows is null/) do
+      UnClone::Kernel.fit(default_config, [] of UnClone::IndexedRow, 0, 0)
     end
   end
 end

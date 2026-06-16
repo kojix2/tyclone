@@ -56,7 +56,7 @@ lib LibPcv
   fun pcv_error_free = pcv_error_free(err : PcvError*) : Nil
 end
 
-module Tyclone
+module UnClone
   module KernelAbi
     alias Row = LibPcv::PcvRow
     alias ViConfig = LibPcv::PcvConfig
@@ -80,7 +80,7 @@ module Tyclone
       end
     end
 
-    def self.build_vi_config(config : Tyclone::ViConfig, effective_seed : UInt64?) : ViConfig
+    def self.build_vi_config(config : UnClone::ViConfig, effective_seed : UInt64?) : ViConfig
       ViConfig.new(
         num_clusters: config.num_clusters,
         num_grid_points: config.num_grid_points,
@@ -98,8 +98,8 @@ module Tyclone
       )
     end
 
-    private def self.density_code(density : Tyclone::Density) : UInt8
-      density == Tyclone::Density::Binomial ? 0_u8 : 1_u8
+    private def self.density_code(density : UnClone::Density) : UInt8
+      density == UnClone::Density::Binomial ? 0_u8 : 1_u8
     end
 
     private def self.seed_flag(effective_seed : UInt64?) : UInt8

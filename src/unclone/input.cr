@@ -1,6 +1,6 @@
 require "csv"
 
-module Tyclone
+module UnClone
   struct InputRow
     getter mutation_id : String
     getter sample_id : String

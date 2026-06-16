@@ -159,7 +159,7 @@ impl CompatTreeShellNodeAdder {
 /// prior weight) while `log_p()` returns the non-uniform log-probability that
 /// includes the outlier penalty.  When `outlier_modelling_active` is `true`
 /// this mismatch makes the importance weights incorrect in the upstream code.
-/// tyclone intentionally **does not** reproduce that bug; the sampling
+/// unclone intentionally **does not** reproduce that bug; the sampling
 /// distribution and `log_q` are always consistent here.
 pub fn build_bootstrap_proposal_set(
     tree: &CompatTree,
@@ -724,7 +724,7 @@ mod tests {
     }
 
     // ──────────────────────────────────────────────────────────────────────────────
-    // Oracle tests: compare tyclone log_q with values derived directly from
+    // Oracle tests: compare unclone log_q with values derived directly from
     // PhyClone's proposal formulas.  Each test fixes a small tree, uses a constant
     // scorer (returns 0.0), and checks every candidate's log_q to 1e-12 precision.
     // ──────────────────────────────────────────────────────────────────────────────
@@ -779,7 +779,7 @@ mod tests {
     // ── Semi-adapted: empty tree, outlier active ──────────────────────────────────
     // PhyClone: parent_is_empty_tree=True, trees=[NewNode{[]}, Outlier],
     //   both scored 0.0 → normalized = log(0.5) each.
-    // Tyclone path: existing_or_outlier=[Outlier] → normalized=[0.0],
+    // UnClone path: existing_or_outlier=[Outlier] → normalized=[0.0],
     //   Outlier→log_half+0.0=log(0.5); NewNode{[]} via semi_new_log_q(0,0)=log(0.5).
     #[test]
     fn oracle_semi_adapted_empty_tree_outlier_active() {

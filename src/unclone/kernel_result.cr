@@ -1,4 +1,4 @@
-module Tyclone
+module UnClone
   abstract class KernelResultHandle
     abstract def free
   end

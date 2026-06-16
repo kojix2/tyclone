@@ -1,13 +1,13 @@
-# tyclone
+# UnClone
 
-[![build](https://github.com/kojix2/tyclone/actions/workflows/build.yml/badge.svg)](https://github.com/kojix2/tyclone/actions/workflows/build.yml)
-[![Lines of Code](https://img.shields.io/endpoint?url=https%3A%2F%2Ftokei.kojix2.net%2Fbadge%2Fgithub%2Fkojix2%2Ftyclone%2Flines)](https://tokei.kojix2.net/github/kojix2/tyclone)
+[![build](https://github.com/kojix2/unclone/actions/workflows/build.yml/badge.svg)](https://github.com/kojix2/unclone/actions/workflows/build.yml)
+[![Lines of Code](https://img.shields.io/endpoint?url=https%3A%2F%2Ftokei.kojix2.net%2Fbadge%2Fgithub%2Fkojix2%2Funclone%2Flines)](https://tokei.kojix2.net/github/kojix2/unclone)
 ![Static Badge](https://img.shields.io/badge/PURE-VIBE_CODING-magenta)
 [![DOI](https://zenodo.org/badge/1207957296.svg)](https://doi.org/10.5281/zenodo.20711091)
 
-An unofficial PyClone and PhyClone Clone for Clonal Analysis
+UnClone - An unofficial PyClone and PhyClone Clone for Clonal Analysis
 
-tyclone is an unofficial reimplementation of [PyClone-VI](https://github.com/Roth-Lab/pyclone-vi) and [PhyClone](https://github.com/Roth-Lab/phyclone).
+unclone is an unofficial reimplementation of [PyClone-VI](https://github.com/Roth-Lab/pyclone-vi) and [PhyClone](https://github.com/Roth-Lab/phyclone).
 Written in Crystal CLI with a Rust kernel.
 
 ## Scope
@@ -47,7 +47,7 @@ For an optimized Crystal CLI build, use:
 make build release=1
 ```
 
-The resulting binary is `bin/tyclone`.
+The resulting binary is `bin/unclone`.
 
 ## Test
 
@@ -60,22 +60,22 @@ make test
 Variational inference:
 
 ```bash
-./bin/tyclone vi -i ../pyclone-vi/examples/synthetic.tsv -o out.tsv
+./bin/unclone vi -i ../pyclone-vi/examples/synthetic.tsv -o out.tsv
 ```
 
 Deterministic VI run:
 
 ```bash
-./bin/tyclone vi -i ../pyclone-vi/examples/synthetic.tsv -o out.tsv -c 4 -d beta-binomial -g 21 -r 2 --max-iters=200 --precision=1000 --seed=7 --kernel-threads=1 --restart-parallelism=1 --print-freq=0
+./bin/unclone vi -i ../pyclone-vi/examples/synthetic.tsv -o out.tsv -c 4 -d beta-binomial -g 21 -r 2 --max-iters=200 --precision=1000 --seed=7 --kernel-threads=1 --restart-parallelism=1 --print-freq=0
 ```
 
 Phy workflow:
 
 ```bash
-./bin/tyclone phy run -i input.tsv -o trace.jsonl --num-iters=50 --num-chains=2 --num-particles=16 --burnin=1000 --seed=7
-./bin/tyclone phy map -i trace.jsonl -o map.json
-./bin/tyclone phy consensus -i trace.jsonl -o consensus.json --consensus-threshold=0.5
-./bin/tyclone phy topology-report -i trace.jsonl -o topology_report.json
+./bin/unclone phy run -i input.tsv -o trace.jsonl --num-iters=50 --num-chains=2 --num-particles=16 --burnin=1000 --seed=7
+./bin/unclone phy map -i trace.jsonl -o map.json
+./bin/unclone phy consensus -i trace.jsonl -o consensus.json --consensus-threshold=0.5
+./bin/unclone phy topology-report -i trace.jsonl -o topology_report.json
 ```
 
 Expected input columns are:
@@ -96,7 +96,7 @@ Optional columns:
 Larger VI run:
 
 ```bash
-./bin/tyclone vi -i ../pyclone-vi/examples/tracerx.tsv -o out.tsv -c 40 -d beta-binomial -r 2 --precision=200 --seed=7 --print-freq=0
+./bin/unclone vi -i ../pyclone-vi/examples/tracerx.tsv -o out.tsv -c 40 -d beta-binomial -r 2 --precision=200 --seed=7 --print-freq=0
 ```
 
 ## Common Options
@@ -140,7 +140,7 @@ Phy run only:
 
 Python helper selection:
 
-- `TYCLONE_PYTHON`: default Python executable for helper scripts
+- `UNCLONE_PYTHON`: default Python executable for helper scripts
 
 Notes:
 
@@ -152,7 +152,7 @@ Restart diagnostics for VI:
 
 ```bash
 PCV_DEBUG_RESTART_METRICS_FILE=restart_metrics.csv \
-./bin/tyclone vi -i ../pyclone-vi/examples/tracerx.tsv -o out.tsv -c 40 -d beta-binomial -r 2 --precision=200 --seed=7 --print-freq=1
+./bin/unclone vi -i ../pyclone-vi/examples/tracerx.tsv -o out.tsv -c 40 -d beta-binomial -r 2 --precision=200 --seed=7 --print-freq=1
 ```
 
 This writes one row per restart with:
@@ -167,7 +167,7 @@ Optional kernel profiling:
 
 ```bash
 PCV_PROFILE=1 \
-./bin/tyclone vi -i ../pyclone-vi/examples/tracerx.tsv -o out.tsv -c 4 -d beta-binomial -r 1 --precision=200 --seed=7 --print-freq=0
+./bin/unclone vi -i ../pyclone-vi/examples/tracerx.tsv -o out.tsv -c 4 -d beta-binomial -r 1 --precision=200 --seed=7 --print-freq=0
 ```
 
 This prints aggregated timings to stderr for:
@@ -181,7 +181,7 @@ This prints aggregated timings to stderr for:
 Debug-only initial value injection:
 
 ```bash
-./bin/tyclone vi -i ../pyclone-vi/examples/synthetic.tsv -o out.tsv -c 4 -g 21 -r 1 --debug-init-file=init.json --print-freq=0
+./bin/unclone vi -i ../pyclone-vi/examples/synthetic.tsv -o out.tsv -c 4 -g 21 -r 1 --debug-init-file=init.json --print-freq=0
 ```
 
 The JSON file must contain flat `pi`, `theta`, and `z` arrays matching:
@@ -212,7 +212,7 @@ This hook is intended for implementation comparison and fairness checks, not nor
 
 ## Attribution And License
 
-tyclone is an unofficial reimplementation of the methods below. Cite the original papers, not tyclone.
+unclone is an unofficial reimplementation of the methods below. Cite the original papers, not unclone.
 
 - PyClone-VI — [Roth-Lab/pyclone-vi](https://github.com/Roth-Lab/pyclone-vi) —
   Gillis & Roth, *BMC Bioinformatics* 2020. doi:[10.1186/s12859-020-03919-2](https://doi.org/10.1186/s12859-020-03919-2)
@@ -221,4 +221,4 @@ tyclone is an unofficial reimplementation of the methods below. Cite the origina
 - PyClone — [Roth-Lab/pyclone](https://github.com/Roth-Lab/pyclone) —
   Roth et al., *Nature Methods* 2014. doi:[10.1038/nmeth.2883](https://doi.org/10.1038/nmeth.2883)
 
-Upstream is GPL v3 or later; tyclone is GPL v3 or later as well.
+Upstream is GPL v3 or later; unclone is GPL v3 or later as well.

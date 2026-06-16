@@ -1,11 +1,11 @@
-name: tyclone
+name: unclone
 version: 0.0.1
 
 authors:
   - kojix2 <2xijok@gmail.com>
 
 targets:
-  tyclone:
+  unclone:
     main: src/main.cr
 
 crystal: '>= 1.19.1'

@@ -1,4 +1,4 @@
-module Tyclone
+module UnClone
   enum Density
     Binomial
     BetaBinomial

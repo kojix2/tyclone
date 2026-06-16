@@ -1,6 +1,6 @@
 require "option_parser"
 
-module Tyclone
+module UnClone
   module CLI
     class Parser < OptionParser
       @selected_command : Symbol?
@@ -37,11 +37,11 @@ module Tyclone
         self.summary_width = 26
         self.banner = <<-BANNER
 
-          Program: #{PROGRAM} (Reimplementation of PyClone-VI and PhyClone)
+          Program: #{DISPLAY_NAME} (Reimplementation of PyClone-VI and PhyClone)
           Version: #{VERSION}
           Source:  #{SOURCE}
 
-          Usage: tyclone <command> [options]
+          Usage: unclone <command> [options]
 
           BANNER
 
@@ -51,7 +51,7 @@ module Tyclone
         end
 
         on("vi", "Run PyClone-VI variational inference") do
-          _set_command_(:fit_vi, "Usage: tyclone vi [options]")
+          _set_command_(:fit_vi, "Usage: unclone vi [options]")
 
           on("-i FILE", "--in-file=FILE", "Input TSV") { |v| @vi_config.in_file = v }
           on("-o FILE", "--out-file=FILE", "Output TSV") { |v| @vi_config.out_file = v }
@@ -182,7 +182,7 @@ module Tyclone
       private def phy_help_message : String
         <<-HELP
 
-          Usage: tyclone phy <subcommand> [options]
+          Usage: unclone phy <subcommand> [options]
 
           Status:
             In progress.
@@ -194,7 +194,7 @@ module Tyclone
             consensus         Build a consensus tree from a trace
             topology-report   Summarize sampled topologies from a trace
 
-          Run `tyclone phy <subcommand> --help` for subcommand options.
+          Run `unclone phy <subcommand> --help` for subcommand options.
 
           HELP
       end
@@ -203,7 +203,7 @@ module Tyclone
         config = PhyCloneRunConfig.new
         show_help = false
         parser = OptionParser.new do |opts|
-          opts.banner = "Usage: tyclone phy run [options]"
+          opts.banner = "Usage: unclone phy run [options]"
           opts.on("-i FILE", "--in-file=FILE", "Input TSV") { |v| config.in_file = v }
           opts.on("-o FILE", "--out-file=FILE", "Output JSONL trace") { |v| config.out_file = v }
           opts.on("-c FILE", "--cluster-file=FILE", "Optional cluster assignment TSV (mutation_id, cluster_id)") { |v| config.cluster_file = v }
@@ -310,14 +310,14 @@ module Tyclone
       end
 
       private def parse_phy_map(args : Array(String)) : Command
-        parse_phy_trace_io_command(args, "Usage: tyclone phy map [options]", PhyCloneMapConfig.new)
+        parse_phy_trace_io_command(args, "Usage: unclone phy map [options]", PhyCloneMapConfig.new)
       end
 
       private def parse_phy_consensus(args : Array(String)) : Command
         config = PhyCloneConsensusConfig.new
         show_help = false
         parser = OptionParser.new do |opts|
-          opts.banner = "Usage: tyclone phy consensus [options]"
+          opts.banner = "Usage: unclone phy consensus [options]"
           opts.on("-i FILE", "--in-file=FILE", "Input JSONL trace") { |v| config.in_file = v }
           opts.on("-o FILE", "--out-file=FILE", "Output consensus JSON") { |v| config.out_file = v }
           opts.on("--consensus-threshold=F", "Minimum topology support fraction") { |v| config.consensus_threshold = v.to_f64 }
@@ -340,7 +340,7 @@ module Tyclone
       end
 
       private def parse_phy_topology_report(args : Array(String)) : Command
-        parse_phy_trace_io_command(args, "Usage: tyclone phy topology-report [options]", PhyCloneTopologyReportConfig.new)
+        parse_phy_trace_io_command(args, "Usage: unclone phy topology-report [options]", PhyCloneTopologyReportConfig.new)
       end
     end
 
