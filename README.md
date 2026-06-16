@@ -202,9 +202,13 @@ This hook is intended for implementation comparison and fairness checks, not nor
 
 ## Attribution And License
 
-This project is a close reimplementation developed with direct reference to the upstream projects, their published methods, and their user-facing behavior.
+tyclone is an unofficial reimplementation of the methods below. Cite the original papers, not tyclone.
 
-- Upstream projects: PyClone, PyClone-VI
-- Upstream repositories: Roth-Lab/pyclone, Roth-Lab/pyclone-vi
+- PyClone-VI — [Roth-Lab/pyclone-vi](https://github.com/Roth-Lab/pyclone-vi) —
+  Gillis & Roth, *BMC Bioinformatics* 2020. doi:[10.1186/s12859-020-03919-2](https://doi.org/10.1186/s12859-020-03919-2)
+- PhyClone — [Roth-Lab/PhyClone](https://github.com/Roth-Lab/PhyClone) —
+  Hurtado, Bouchard-Côté & Roth, *Bioinformatics* 2025. doi:[10.1093/bioinformatics/btaf344](https://doi.org/10.1093/bioinformatics/btaf344)
+- PyClone — [Roth-Lab/pyclone](https://github.com/Roth-Lab/pyclone) —
+  Roth et al., *Nature Methods* 2014. doi:[10.1038/nmeth.2883](https://doi.org/10.1038/nmeth.2883)
 
-The upstream projects are distributed under GNU GPL v3 or later. This project is distributed under GPL v3 or later as well.
+Upstream is GPL v3 or later; tyclone is GPL v3 or later as well.
