@@ -2,6 +2,8 @@
 
 [![build](https://github.com/kojix2/tyclone/actions/workflows/build.yml/badge.svg)](https://github.com/kojix2/tyclone/actions/workflows/build.yml)
 [![Lines of Code](https://img.shields.io/endpoint?url=https%3A%2F%2Ftokei.kojix2.net%2Fbadge%2Fgithub%2Fkojix2%2Ftyclone%2Flines)](https://tokei.kojix2.net/github/kojix2/tyclone)
+![Static Badge](https://img.shields.io/badge/PURE-VIBE_CODING-magenta)
+[![DOI](https://zenodo.org/badge/1207957296.svg)](https://doi.org/10.5281/zenodo.20711091)
 
 tyclone is an unofficial reimplementation of [PyClone-VI](https://github.com/Roth-Lab/pyclone-vi) and [PhyClone](https://github.com/Roth-Lab/phyclone).
 Written in Crystal CLI with a Rust kernel.
