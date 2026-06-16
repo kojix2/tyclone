@@ -14,22 +14,48 @@ permissions:
 
 jobs:
   build:
-    name: build ${{ matrix.target }}
+    name: build ${{ matrix.target }} (${{ matrix.microarch }})
     runs-on: ${{ matrix.os }}
+    env:
+      # Applied to every cargo invocation (tests + release build) on the host.
+      # The musl release build runs inside Docker, so it forwards this via `docker exec -e`.
+      RUSTFLAGS: ${{ matrix.rustflags }}
     strategy:
       fail-fast: false
       matrix:
         include:
+          # x86_64 Linux: portable baseline (SSE4.2) + AVX2/FMA build.
+          # The hot VI contractions are ~2x faster with FMA (x86-64-v3, Haswell 2013+).
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
+            microarch: baseline
+            rustflags: "-C target-cpu=x86-64-v2"
             shell: bash
             package_ext: tar.gz
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            microarch: v3
+            rustflags: "-C target-cpu=x86-64-v3"
+            shell: bash
+            package_ext: tar.gz
+          # Apple Silicon: aarch64 baseline already includes NEON+FMA, so no variant needed.
           - os: macos-latest
             target: aarch64-apple-darwin
+            microarch: baseline
+            rustflags: ""
             shell: bash
             package_ext: tar.gz
+          # x86_64 Windows: same baseline + AVX2/FMA split as Linux.
           - os: windows-latest
             target: x86_64-pc-windows-gnu
+            microarch: baseline
+            rustflags: "-C target-cpu=x86-64-v2"
+            shell: msys2 {0}
+            package_ext: zip
+          - os: windows-latest
+            target: x86_64-pc-windows-gnu
+            microarch: v3
+            rustflags: "-C target-cpu=x86-64-v3"
             shell: msys2 {0}
             package_ext: zip
 
@@ -124,7 +150,7 @@ jobs:
           docker exec unclone-alpine apk add --no-cache build-base readline-dev readline-static ncurses-dev ncurses-static ncurses-libs rust cargo make
           mkdir -p .home .cargo .rustup
           docker exec -u "$(id -u):$(id -g)" -e HOME=/workspace/.home -e CARGO_HOME=/workspace/.cargo -e RUSTUP_HOME=/workspace/.rustup unclone-alpine shards install --without-development
-          docker exec -u "$(id -u):$(id -g)" -e HOME=/workspace/.home -e CARGO_HOME=/workspace/.cargo -e RUSTUP_HOME=/workspace/.rustup unclone-alpine make build release=1 EXTRA_CRYSTAL_BUILD_FLAGS="--static"
+          docker exec -u "$(id -u):$(id -g)" -e HOME=/workspace/.home -e CARGO_HOME=/workspace/.cargo -e RUSTUP_HOME=/workspace/.rustup -e RUSTFLAGS="$RUSTFLAGS" unclone-alpine make build release=1 EXTRA_CRYSTAL_BUILD_FLAGS="--static"
 
       - name: Build release binary (Linux host check)
         if: matrix.target == 'x86_64-unknown-linux-musl'
@@ -175,7 +201,7 @@ jobs:
       - name: Package artifact
         if: matrix.target != 'x86_64-pc-windows-gnu'
         run: |
-          PKG="unclone-${VERSION}-${{ matrix.target }}"
+          PKG="unclone-${VERSION}-${{ matrix.target }}-${{ matrix.microarch }}"
           mkdir -p "$PKG"
           cp ./bin/unclone "$PKG/"
           cp LICENSE "$PKG/"
@@ -186,7 +212,7 @@ jobs:
         if: matrix.target == 'x86_64-pc-windows-gnu'
         shell: msys2 {0}
         run: |
-          PKG="unclone-${VERSION}-${{ matrix.target }}"
+          PKG="unclone-${VERSION}-${{ matrix.target }}-${{ matrix.microarch }}"
           mkdir -p "$PKG"
           cp ./bin/unclone.exe "$PKG/"
           cp LICENSE "$PKG/"
@@ -196,7 +222,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: unclone-${{ matrix.target }}
+          name: unclone-${{ matrix.target }}-${{ matrix.microarch }}
           path: |
             unclone-*.tar.gz
             unclone-*.zip
