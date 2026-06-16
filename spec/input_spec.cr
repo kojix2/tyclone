@@ -35,4 +35,38 @@ describe Tyclone::Input do
       File.delete(path) if File.exists?(path)
     end
   end
+
+  it "raises a line-numbered CliError for invalid numeric values" do
+    path = File.join(Dir.tempdir, "tyclone_input_#{Random.rand(1_000_000)}.tsv")
+    begin
+      File.write(
+        path,
+        "mutation_id\tsample_id\tref_counts\talt_counts\tmajor_cn\tminor_cn\tnormal_cn\n" +
+        "m1\ts1\tnope\t5\t2\t1\t2\n"
+      )
+
+      expect_raises(Tyclone::CliError, /Line 2: invalid integer for 'ref_counts': nope/) do
+        Tyclone::Input.read_tsv(path)
+      end
+    ensure
+      File.delete(path) if File.exists?(path)
+    end
+  end
+
+  it "rejects invalid count and probability ranges" do
+    path = File.join(Dir.tempdir, "tyclone_input_#{Random.rand(1_000_000)}.tsv")
+    begin
+      File.write(
+        path,
+        "mutation_id\tsample_id\tref_counts\talt_counts\tmajor_cn\tminor_cn\tnormal_cn\ttumour_content\n" +
+        "m1\ts1\t10\t5\t2\t1\t2\t1.5\n"
+      )
+
+      expect_raises(Tyclone::CliError, /Line 2: tumour_content must be within \[0, 1\]/) do
+        Tyclone::Input.read_tsv(path)
+      end
+    ensure
+      File.delete(path) if File.exists?(path)
+    end
+  end
 end

@@ -189,36 +189,57 @@ module Tyclone
 
       def self.read_tsv(path : String) : Array(InputRow)
         rows = [] of InputRow
-        file = File.open(path)
-        csv = CSV.new(file, headers: true, separator: '\t')
-        headers = csv.headers || [] of String
-        missing = REQUIRED_COLUMNS.reject { |column| headers.includes?(column) }
-        unless missing.empty?
-          raise CliError.new("Missing required columns for phy run: #{missing.join(", ")}")
-        end
+        File.open(path) do |file|
+          csv = CSV.new(file, headers: true, separator: '\t')
+          headers = csv.headers || [] of String
+          missing = REQUIRED_COLUMNS.reject { |column| headers.includes?(column) }
+          unless missing.empty?
+            raise CliError.new("Missing required columns for phy run: #{missing.join(", ")}")
+          end
 
-        csv.each do |row|
-          cluster_id = row["cluster_id"]?.try(&.presence).try(&.to_i)
-          chrom = row["chrom"]?.try(&.presence)
-          outlier_prob = row["outlier_prob"]?.try(&.presence).try(&.to_f)
+          line_number = 1
+          csv.each do |row|
+            line_number += 1
+            cluster_id = optional_i32(row, "cluster_id", line_number)
+            chrom = row["chrom"]?.try(&.presence)
+            outlier_prob = optional_probability(row, "outlier_prob", line_number)
+            loss_prob = optional_probability(row, "loss_prob", line_number)
+            ref_counts = parse_i32(row, "ref_counts", line_number)
+            alt_counts = parse_i32(row, "alt_counts", line_number)
+            major_cn = parse_i32(row, "major_cn", line_number)
+            minor_cn = parse_i32(row, "minor_cn", line_number)
+            normal_cn = parse_i32(row, "normal_cn", line_number)
+            tumour_content = parse_f64(row, "tumour_content", line_number, "1.0")
+            error_rate = parse_f64(row, "error_rate", line_number, "0.001")
 
-          rows << InputRow.new(
-            mutation_id: required(row, "mutation_id"),
-            sample_id: required(row, "sample_id"),
-            ref_counts: required(row, "ref_counts").to_i,
-            alt_counts: required(row, "alt_counts").to_i,
-            major_cn: required(row, "major_cn").to_i,
-            minor_cn: required(row, "minor_cn").to_i,
-            normal_cn: required(row, "normal_cn").to_i,
-            tumour_content: optional(row, "tumour_content", "1.0").to_f,
-            error_rate: optional(row, "error_rate", "0.001").to_f,
-            cluster_id: cluster_id,
-            chrom: chrom,
-            loss_prob: row["loss_prob"]?.try(&.presence).try(&.to_f),
-            outlier_prob: outlier_prob,
-          )
+            validate_values(
+              line_number,
+              ref_counts,
+              alt_counts,
+              major_cn,
+              minor_cn,
+              normal_cn,
+              tumour_content,
+              error_rate
+            )
+
+            rows << InputRow.new(
+              mutation_id: required(row, "mutation_id", line_number),
+              sample_id: required(row, "sample_id", line_number),
+              ref_counts: ref_counts,
+              alt_counts: alt_counts,
+              major_cn: major_cn,
+              minor_cn: minor_cn,
+              normal_cn: normal_cn,
+              tumour_content: tumour_content,
+              error_rate: error_rate,
+              cluster_id: cluster_id,
+              chrom: chrom,
+              loss_prob: loss_prob,
+              outlier_prob: outlier_prob,
+            )
+          end
         end
-        file.close
         rows
       end
 
@@ -244,7 +265,7 @@ module Tyclone
 
       def self.read_cluster_tsv(path : String) : Hash(String, Int32)
         read_cluster_tsv_full(path).each_with_object({} of String => Int32) do |row, mapping|
-          cluster_id = row.cluster_id.to_i
+          cluster_id = row.cluster_id.to_i32? || raise CliError.new("cluster-file has invalid integer cluster_id for mutation '#{row.mutation_id}': #{row.cluster_id}")
           if mapping.has_key?(row.mutation_id) && mapping[row.mutation_id] != cluster_id
             raise CliError.new("cluster-file has conflicting cluster_id for mutation '#{row.mutation_id}'")
           end
@@ -254,30 +275,32 @@ module Tyclone
 
       def self.read_cluster_tsv_full(path : String) : Array(ClusterRow)
         rows = [] of ClusterRow
-        file = File.open(path)
-        csv = CSV.new(file, headers: true, separator: '\t')
-        headers = csv.headers || [] of String
-        unless headers.includes?("mutation_id") && headers.includes?("cluster_id")
-          raise CliError.new("cluster-file must include mutation_id and cluster_id columns")
-        end
+        File.open(path) do |file|
+          csv = CSV.new(file, headers: true, separator: '\t')
+          headers = csv.headers || [] of String
+          unless headers.includes?("mutation_id") && headers.includes?("cluster_id")
+            raise CliError.new("cluster-file must include mutation_id and cluster_id columns")
+          end
 
-        csv.each do |row|
-          mutation_id = required(row, "mutation_id")
-          cluster_id = required(row, "cluster_id")
-          sample_id = headers.includes?("sample_id") ? row["sample_id"]?.try(&.presence) : nil
-          chrom = headers.includes?("chrom") ? row["chrom"]?.try(&.presence) : nil
-          cellular_prevalence = headers.includes?("cellular_prevalence") ? row["cellular_prevalence"]?.try(&.to_f64?) : nil
-          outlier_prob = headers.includes?("outlier_prob") ? row["outlier_prob"]?.try(&.to_f64?) : nil
-          rows << ClusterRow.new(mutation_id, cluster_id, sample_id, chrom, cellular_prevalence, outlier_prob)
+          line_number = 1
+          csv.each do |row|
+            line_number += 1
+            mutation_id = required(row, "mutation_id", line_number)
+            cluster_id = required(row, "cluster_id", line_number)
+            sample_id = headers.includes?("sample_id") ? row["sample_id"]?.try(&.presence) : nil
+            chrom = headers.includes?("chrom") ? row["chrom"]?.try(&.presence) : nil
+            cellular_prevalence = headers.includes?("cellular_prevalence") ? optional_probability(row, "cellular_prevalence", line_number) : nil
+            outlier_prob = headers.includes?("outlier_prob") ? optional_probability(row, "outlier_prob", line_number) : nil
+            rows << ClusterRow.new(mutation_id, cluster_id, sample_id, chrom, cellular_prevalence, outlier_prob)
+          end
         end
-        file.close
         rows
       end
 
-      private def self.required(row : CSV, key : String) : String
+      private def self.required(row : CSV, key : String, line_number : Int32) : String
         value = row[key]?
         if value.nil? || value.empty?
-          raise CliError.new("Missing value for '#{key}' in a phy input row")
+          raise CliError.new("Line #{line_number}: missing value for '#{key}' in phy input")
         end
         value
       end
@@ -286,6 +309,60 @@ module Tyclone
         value = row[key]?
         return default_value if value.nil? || value.empty?
         value
+      end
+
+      private def self.parse_i32(row : CSV, key : String, line_number : Int32) : Int32
+        value = required(row, key, line_number)
+        value.to_i32? || raise CliError.new("Line #{line_number}: invalid integer for '#{key}': #{value}")
+      end
+
+      private def self.optional_i32(row : CSV, key : String, line_number : Int32) : Int32?
+        value = row[key]?.try(&.presence)
+        return nil unless value
+        value.to_i32? || raise CliError.new("Line #{line_number}: invalid integer for '#{key}': #{value}")
+      end
+
+      private def self.parse_f64(row : CSV, key : String, line_number : Int32, default_value : String) : Float64
+        value = optional(row, key, default_value)
+        parsed = value.to_f64?
+        unless parsed && parsed.finite?
+          raise CliError.new("Line #{line_number}: invalid number for '#{key}': #{value}")
+        end
+        parsed
+      end
+
+      private def self.optional_probability(row : CSV, key : String, line_number : Int32) : Float64?
+        value = row[key]?.try(&.presence)
+        return nil unless value
+        parsed = value.to_f64?
+        unless parsed && parsed.finite?
+          raise CliError.new("Line #{line_number}: invalid number for '#{key}': #{value}")
+        end
+        unless (0.0..1.0).includes?(parsed)
+          raise CliError.new("Line #{line_number}: #{key} must be within [0, 1]")
+        end
+        parsed
+      end
+
+      private def self.validate_values(
+        line_number : Int32,
+        ref_counts : Int32,
+        alt_counts : Int32,
+        major_cn : Int32,
+        minor_cn : Int32,
+        normal_cn : Int32,
+        tumour_content : Float64,
+        error_rate : Float64,
+      ) : Nil
+        raise CliError.new("Line #{line_number}: ref_counts must be >= 0") if ref_counts < 0
+        raise CliError.new("Line #{line_number}: alt_counts must be >= 0") if alt_counts < 0
+        raise CliError.new("Line #{line_number}: total read depth must be > 0") if ref_counts + alt_counts <= 0
+        raise CliError.new("Line #{line_number}: major_cn must be >= 0") if major_cn < 0
+        raise CliError.new("Line #{line_number}: minor_cn must be >= 0") if minor_cn < 0
+        raise CliError.new("Line #{line_number}: normal_cn must be >= 0") if normal_cn < 0
+        raise CliError.new("Line #{line_number}: minor_cn must be <= major_cn") if minor_cn > major_cn
+        raise CliError.new("Line #{line_number}: tumour_content must be within [0, 1]") unless (0.0..1.0).includes?(tumour_content)
+        raise CliError.new("Line #{line_number}: error_rate must be within [0, 1]") unless (0.0..1.0).includes?(error_rate)
       end
     end
 

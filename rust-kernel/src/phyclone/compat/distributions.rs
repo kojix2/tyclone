@@ -6,6 +6,7 @@ use super::tree_stats::{
     CompatNodeCluster, CompatOutlierPoint, CompatTreeLikelihood, CompatTreePriorStats,
 };
 use std::collections::HashSet;
+use std::f64::consts::LN_2;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompatFscrpDistribution {
@@ -110,11 +111,11 @@ impl CompatFscrpDistribution {
         let log_const = self.c_const.max(f64::MIN_POSITIVE).ln();
         let la = log_one;
 
-        let mut numerator = log_one - (log_const * (num_roots as f64));
-        let mut denominator = log_one - log_const;
+        let numerator = log_one - (log_const * (num_roots as f64));
+        let denominator = log_one - log_const;
 
-        numerator = la + (1.0 - (numerator - la).exp()).ln();
-        denominator = la + (1.0 - (denominator - la).exp()).ln();
+        let numerator = la + log1mexp(numerator - la);
+        let denominator = la + log1mexp(denominator - la);
 
         a_term + (numerator - denominator)
     }
@@ -375,6 +376,17 @@ fn log_factorial(n: usize) -> f64 {
         return 0.0;
     }
     (2..=n).fold(0.0, |acc, x| acc + (x as f64).ln())
+}
+
+fn log1mexp(value: f64) -> f64 {
+    if value >= 0.0 {
+        return f64::NEG_INFINITY;
+    }
+    if value < -LN_2 {
+        (-value.exp()).ln_1p()
+    } else {
+        (-value.exp_m1()).ln()
+    }
 }
 
 fn log_sum_exp(values: &[f64]) -> Result<f64, String> {
@@ -843,6 +855,18 @@ mod tests {
         //   = –1.0e-9 – (–0.0010005003335835335)
         //   = 0.001000499333583533  (Python: np.log(1-1e-9) – np.log(1-1e-3))
         approx_eq(fscrp.compute_z_term(3, 5), 1.000_499_333_583_533e-3);
+    }
+
+    #[test]
+    fn fscrp_compute_z_term_is_stable_when_c_const_is_near_one() {
+        let fscrp = CompatFscrpDistribution {
+            alpha: 1.0,
+            c_const: 1.0 + 1e-12,
+        };
+
+        let actual = fscrp.compute_z_term(5, 10);
+        assert!(actual.is_finite());
+        approx_eq_tol(actual, (5.0_f64).ln(), 1e-8);
     }
 
     /// Oracle: `compute_r_term` matches Python `FSCRPDistribution._compute_r_term`.

@@ -39,46 +39,59 @@ module Tyclone
 
     def self.read_tsv(path : String) : Array(InputRow)
       rows = [] of InputRow
-      file = File.open(path)
-      csv = CSV.new(file, headers: true, separator: '\t')
-      headers = csv.headers || [] of String
-      missing = REQUIRED_COLUMNS.reject { |column| headers.includes?(column) }
-      unless missing.empty?
-        raise CliError.new("Missing required columns: #{missing.join(", ")}")
+      File.open(path) do |file|
+        csv = CSV.new(file, headers: true, separator: '\t')
+        headers = csv.headers || [] of String
+        missing = REQUIRED_COLUMNS.reject { |column| headers.includes?(column) }
+        unless missing.empty?
+          raise CliError.new("Missing required columns: #{missing.join(", ")}")
+        end
+
+        line_number = 1
+        csv.each do |row|
+          line_number += 1
+          mutation_id = required(row, "mutation_id", line_number)
+          sample_id = required(row, "sample_id", line_number)
+          ref_counts = parse_i32(row, "ref_counts", line_number)
+          alt_counts = parse_i32(row, "alt_counts", line_number)
+          major_cn = parse_i32(row, "major_cn", line_number)
+          minor_cn = parse_i32(row, "minor_cn", line_number)
+          normal_cn = parse_i32(row, "normal_cn", line_number)
+          tumour_content = parse_f64(row, "tumour_content", line_number, "1.0")
+          error_rate = parse_f64(row, "error_rate", line_number, "0.001")
+
+          validate_values(
+            line_number,
+            ref_counts,
+            alt_counts,
+            major_cn,
+            minor_cn,
+            normal_cn,
+            tumour_content,
+            error_rate
+          )
+
+          rows << InputRow.new(
+            mutation_id: mutation_id,
+            sample_id: sample_id,
+            ref_counts: ref_counts,
+            alt_counts: alt_counts,
+            major_cn: major_cn,
+            minor_cn: minor_cn,
+            normal_cn: normal_cn,
+            tumour_content: tumour_content,
+            error_rate: error_rate
+          )
+        end
       end
 
-      csv.each do |row|
-        mutation_id = required(row, "mutation_id")
-        sample_id = required(row, "sample_id")
-        ref_counts = required(row, "ref_counts")
-        alt_counts = required(row, "alt_counts")
-        major_cn = required(row, "major_cn")
-        minor_cn = required(row, "minor_cn")
-        normal_cn = required(row, "normal_cn")
-        tumour_content = optional(row, "tumour_content", "1.0")
-        error_rate = optional(row, "error_rate", "0.001")
-
-        rows << InputRow.new(
-          mutation_id: mutation_id,
-          sample_id: sample_id,
-          ref_counts: ref_counts.to_i,
-          alt_counts: alt_counts.to_i,
-          major_cn: major_cn.to_i,
-          minor_cn: minor_cn.to_i,
-          normal_cn: normal_cn.to_i,
-          tumour_content: tumour_content.to_f,
-          error_rate: error_rate.to_f
-        )
-      end
-
-      file.close
       rows
     end
 
-    private def self.required(row : CSV, key : String) : String
+    private def self.required(row : CSV, key : String, line_number : Int32) : String
       value = row[key]?
       if value.nil? || value.empty?
-        raise CliError.new("Missing value for '#{key}' in an input row")
+        raise CliError.new("Line #{line_number}: missing value for '#{key}'")
       end
       value
     end
@@ -87,6 +100,41 @@ module Tyclone
       value = row[key]?
       return default_value if value.nil? || value.empty?
       value
+    end
+
+    private def self.parse_i32(row : CSV, key : String, line_number : Int32) : Int32
+      value = required(row, key, line_number)
+      value.to_i32? || raise CliError.new("Line #{line_number}: invalid integer for '#{key}': #{value}")
+    end
+
+    private def self.parse_f64(row : CSV, key : String, line_number : Int32, default_value : String) : Float64
+      value = optional(row, key, default_value)
+      parsed = value.to_f64?
+      unless parsed && parsed.finite?
+        raise CliError.new("Line #{line_number}: invalid number for '#{key}': #{value}")
+      end
+      parsed
+    end
+
+    private def self.validate_values(
+      line_number : Int32,
+      ref_counts : Int32,
+      alt_counts : Int32,
+      major_cn : Int32,
+      minor_cn : Int32,
+      normal_cn : Int32,
+      tumour_content : Float64,
+      error_rate : Float64,
+    ) : Nil
+      raise CliError.new("Line #{line_number}: ref_counts must be >= 0") if ref_counts < 0
+      raise CliError.new("Line #{line_number}: alt_counts must be >= 0") if alt_counts < 0
+      raise CliError.new("Line #{line_number}: total read depth must be > 0") if ref_counts + alt_counts <= 0
+      raise CliError.new("Line #{line_number}: major_cn must be >= 0") if major_cn < 0
+      raise CliError.new("Line #{line_number}: minor_cn must be >= 0") if minor_cn < 0
+      raise CliError.new("Line #{line_number}: normal_cn must be >= 0") if normal_cn < 0
+      raise CliError.new("Line #{line_number}: minor_cn must be <= major_cn") if minor_cn > major_cn
+      raise CliError.new("Line #{line_number}: tumour_content must be within [0, 1]") unless (0.0..1.0).includes?(tumour_content)
+      raise CliError.new("Line #{line_number}: error_rate must be within [0, 1]") unless (0.0..1.0).includes?(error_rate)
     end
   end
 end
